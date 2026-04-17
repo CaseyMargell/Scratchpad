@@ -763,7 +763,10 @@ function readFromClipboard() {
 let formulaSelecting = false;
 let refCursorCol = -1;
 let refCursorRow = -1;
+let refAnchorCol = -1;
+let refAnchorRow = -1;
 let arrowRefActive = false;
+let lastFormulaClickId = null;
 
 function isFormulaMode() {
   if (!isEditing) return false;
@@ -825,9 +828,9 @@ function startEdit(id, initialValue) {
   input.focus();
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; stopEdit(true); moveSelection(0, 1); }
-    else if (e.key === 'Tab') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; stopEdit(true); moveSelection(e.shiftKey ? -1 : 1, 0); }
-    else if (e.key === 'Escape') { clearFormulaRefs(); arrowRefActive = false; stopEdit(false); }
+    if (e.key === 'Enter') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; lastFormulaClickId = null; stopEdit(true); moveSelection(0, 1); }
+    else if (e.key === 'Tab') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; lastFormulaClickId = null; stopEdit(true); moveSelection(e.shiftKey ? -1 : 1, 0); }
+    else if (e.key === 'Escape') { clearFormulaRefs(); arrowRefActive = false; lastFormulaClickId = null; stopEdit(false); }
     else if (isFormulaMode() && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
       if (arrowRefActive || atOperatorBoundary(input)) {
         e.preventDefault();
@@ -835,6 +838,8 @@ function startEdit(id, initialValue) {
           const pos = parseRef(selectedCell);
           refCursorCol = pos.col;
           refCursorRow = pos.row;
+          refAnchorCol = pos.col;
+          refAnchorRow = pos.row;
           formulaInsertPos = input.selectionStart;
           formulaInsertLen = 0;
           arrowRefActive = true;
@@ -843,9 +848,15 @@ function startEdit(id, initialValue) {
         else if (e.key === 'ArrowDown') refCursorRow = Math.min(ROWS - 1, refCursorRow + 1);
         else if (e.key === 'ArrowLeft') refCursorCol = Math.max(0, refCursorCol - 1);
         else if (e.key === 'ArrowRight') refCursorCol = Math.min(COLS - 1, refCursorCol + 1);
-        const ref = cellId(refCursorCol, refCursorRow);
+        if (!e.shiftKey) {
+          refAnchorCol = refCursorCol;
+          refAnchorRow = refCursorRow;
+        }
+        const anchorId = cellId(refAnchorCol, refAnchorRow);
+        const cursorId = cellId(refCursorCol, refCursorRow);
+        const ref = (anchorId === cursorId) ? anchorId : anchorId + ':' + cursorId;
         insertRefIntoFormula(ref);
-        highlightFormulaRange(ref, ref);
+        highlightFormulaRange(anchorId, cursorId);
       }
     }
   });
@@ -911,19 +922,24 @@ grid.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     formulaSelecting = true;
     const input = document.querySelector('.cell-edit');
-    formulaInsertPos = input.selectionStart;
-    formulaInsertLen = 0;
-    const startId = td.dataset.id;
-    insertRefIntoFormula(startId);
-    highlightFormulaRange(startId, startId);
+    const clickedId = td.dataset.id;
+    const anchorId = (e.shiftKey && lastFormulaClickId) ? lastFormulaClickId : clickedId;
+    if (!e.shiftKey) {
+      formulaInsertPos = input.selectionStart;
+      formulaInsertLen = 0;
+    }
+    const ref = anchorId === clickedId ? clickedId : anchorId + ':' + clickedId;
+    insertRefIntoFormula(ref);
+    highlightFormulaRange(anchorId, clickedId);
+    if (!e.shiftKey) lastFormulaClickId = clickedId;
 
     const onMove = (me) => {
       const over = document.elementFromPoint(me.clientX, me.clientY)?.closest('td[data-id]');
       if (over) {
         const endId = over.dataset.id;
-        const ref = endId === startId ? startId : startId + ':' + endId;
-        insertRefIntoFormula(ref);
-        highlightFormulaRange(startId, endId);
+        const dragRef = endId === anchorId ? anchorId : anchorId + ':' + endId;
+        insertRefIntoFormula(dragRef);
+        highlightFormulaRange(anchorId, endId);
       }
     };
     const onUp = () => {
@@ -933,8 +949,6 @@ grid.addEventListener('mousedown', (e) => {
         input.focus();
         const end = formulaInsertPos + formulaInsertLen;
         input.selectionStart = input.selectionEnd = end;
-        formulaInsertPos = end;
-        formulaInsertLen = 0;
       }
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
