@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scratchpad — Icon Gallery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a22;
+    color: #e4e4e7;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; text-align: center; }
+  .sub { text-align: center; color: #a1a1aa; margin-bottom: 40px; font-size: 14px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: #71717a;
+  }
+  .icon-large {
+    width: 160px;
+    height: 160px;
+    margin-bottom: 16px;
+    border-radius: 22px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-small-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .icon-small {
+    width: 48px; height: 48px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .icon-tiny {
+    width: 24px; height: 24px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .number {
+    background: #3f3f46;
+    color: #a1a1aa;
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    position: absolute; top: 12px; right: 12px;
+  }
+  .card { position: relative; }
+  .name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .desc { font-size: 12px; color: #a1a1aa; text-align: center; line-height: 1.5; }
+  svg { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+
+<h1>Scratchpad Icon Ideas</h1>
+<p class="sub">12 directions — each shown at app size (160px), taskbar size (48px), and favicon (24px)</p>
+
+<div class="grid">
+
+<div class="card">
+  <div class="number">1</div>
+  <div class="icon-large" id="i1a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i1b"></div>
+    <div class="icon-tiny" id="i1c"></div>
+  </div>
+  <div class="name">Bold Wordmark</div>
+  <div class="desc">Gradient S letterform. Punchy, brand-y, works like Stripe/Vercel.</div>
+</div>
+
+<div class="card">
+  <div class="number">2</div>
+  <div class="icon-large" id="i2a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i2b"></div>
+    <div class="icon-tiny" id="i2c"></div>
+  </div>
+  <div class="name">Napkin Math</div>
+  <div class="desc">Scribbled equation on torn paper. Playful, human, unexpected.</div>
+</div>
+
+<div class="card">
+  <div class="number">3</div>
+  <div class="icon-large" id="i3a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i3b"></div>
+    <div class="icon-tiny" id="i3c"></div>
+  </div>
+  <div class="name">Honeycomb</div>
+  <div class="desc">Hexagonal cells. Organic take on a grid — warmer than squares.</div>
+</div>
+
+<div class="card">
+  <div class="number">4</div>
+  <div class="icon-large" id="i4a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i4b"></div>
+    <div class="icon-tiny" id="i4c"></div>
+  </div>
+  <div class="name">Sticky Note Stack</div>
+  <div class="desc">Three offset post-its. Tactile, "scratch" metaphor, warm palette.</div>
+</div>
+
+<div class="card">
+  <div class="number">5</div>
+  <div class="icon-large" id="i5a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i5b"></div>
+    <div class="icon-tiny" id="i5c"></div>
+  </div>
+  <div class="name">8-Bit Grid</div>
+  <div class="desc">Retro pixel cells. Nostalgic, game-y, stands out in a dock.</div>
+</div>
+
+<div class="card">
+  <div class="number">6</div>
+  <div class="icon-large" id="i6a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i6b"></div>
+    <div class="icon-tiny" id="i6c"></div>
+  </div>
+  <div class="name">Enso Circle</div>
+  <div class="desc">Zen brushstroke. Minimalist, meditative, very un-spreadsheet.</div>
+</div>
+
+<div class="card">
+  <div class="number">7</div>
+  <div class="icon-large" id="i7a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i7b"></div>
+    <div class="icon-tiny" id="i7c"></div>
+  </div>
+  <div class="name">Spectrum Bars</div>
+  <div class="desc">Data-viz gradient bars. Signals "numbers" without being literal.</div>
+</div>
+
+<div class="card">
+  <div class="number">8</div>
+  <div class="icon-large" id="i8a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i8b"></div>
+    <div class="icon-tiny" id="i8c"></div>
+  </div>
+  <div class="name">Bento Box</div>
+  <div class="desc">Compartmentalized rectangles. Modern, organized, trendy palette.</div>
+</div>
+
+<div class="card">
+  <div class="number">9</div>
+  <div class="icon-large" id="i9a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i9b"></div>
+    <div class="icon-tiny" id="i9c"></div>
+  </div>
+  <div class="name">Paper Airplane</div>
+  <div class="desc">Clean folded origami. Implies quick, light, shareable.</div>
+</div>
+
+<div class="card">
+  <div class="number">10</div>
+  <div class="icon-large" id="i10a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i10b"></div>
+    <div class="icon-tiny" id="i10c"></div>
+  </div>
+  <div class="name">Neon Grid</div>
+  <div class="desc">Cyberpunk glowing wireframe. Bold, distinctive, memorable.</div>
+</div>
+
+<div class="card">
+  <div class="number">11</div>
+  <div class="icon-large" id="i11a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i11b"></div>
+    <div class="icon-tiny" id="i11c"></div>
+  </div>
+  <div class="name">Abacus</div>
+  <div class="desc">Colorful calculation beads. Tactile, friendly, playful math.</div>
+</div>
+
+<div class="card">
+  <div class="number">12</div>
+  <div class="icon-large" id="i12a"></div>
+  <div class="icon-small-row">
+    <div class="icon-small" id="i12b"></div>
+    <div class="icon-tiny" id="i12c"></div>
+  </div>
+  <div class="name">Prism Split</div>
+  <div class="desc">Light refracting into spectrum. Elegant, scientific, surprising.</div>
+</div>
+
+</div>
+
+<script>
+// Each icon defined as a function returning SVG string
+const icons = {
+  1: () => `<svg viewBox="0 0 512 512">
+    <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient></defs>
+    <rect width="512" height="512" rx="110" fill="url(#g1)"/>
+    <text x="256" y="380" font-family="Georgia, serif" font-size="380" font-weight="900" fill="white" text-anchor="middle" font-style="italic">S</text>
+  </svg>`,
+
+  2: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#fef3c7"/>
+    <path d="M 80 100 L 432 80 L 440 420 L 360 440 L 80 432 Z" fill="#fffbeb" stroke="#e7a008" stroke-width="3"/>
+    <path d="M 360 440 L 432 420 L 380 400 Z" fill="#fde68a" stroke="#e7a008" stroke-width="3"/>
+    <text x="160" y="220" font-family="Comic Sans MS, cursive" font-size="60" fill="#1e40af" transform="rotate(-3 160 220)">y = mx</text>
+    <text x="160" y="310" font-family="Comic Sans MS, cursive" font-size="72" font-weight="700" fill="#dc2626" transform="rotate(-2 160 310)">∑ = 42</text>
+    <circle cx="330" cy="170" r="8" fill="#1e40af"/>
+    <circle cx="280" cy="350" r="6" fill="#dc2626"/>
+  </svg>`,
+
+  3: () => {
+    const hex = (cx, cy, r, fill) => {
+      const points = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI/3 * i - Math.PI/2;
+        points.push(`${cx + r*Math.cos(a)},${cy + r*Math.sin(a)}`);
+      }
+      return `<polygon points="${points.join(' ')}" fill="${fill}" stroke="#fbbf24" stroke-width="6"/>`;
+    };
+    const r = 70, dx = r * Math.sqrt(3), dy = r * 1.5;
+    return `<svg viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="110" fill="#78350f"/>
+      ${hex(256, 256 - 2*dy, r, '#fcd34d')}
+      ${hex(256 - dx, 256 - dy, r, '#f59e0b')}
+      ${hex(256 + dx, 256 - dy, r, '#fde68a')}
+      ${hex(256, 256, r, '#fbbf24')}
+      ${hex(256 - dx, 256 + dy, r, '#fde68a')}
+      ${hex(256 + dx, 256 + dy, r, '#f59e0b')}
+      ${hex(256, 256 + 2*dy, r, '#fcd34d')}
+    </svg>`;
+  },
+
+  4: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#f3f4f6"/>
+    <g transform="translate(80 140) rotate(-8 130 130)">
+      <rect width="260" height="260" fill="#a5f3fc" stroke="#06b6d4" stroke-width="2"/>
+    </g>
+    <g transform="translate(140 100) rotate(4 130 130)">
+      <rect width="260" height="260" fill="#fecaca" stroke="#ef4444" stroke-width="2"/>
+    </g>
+    <g transform="translate(180 140) rotate(-2 130 130)">
+      <rect width="260" height="260" fill="#fef08a" stroke="#eab308" stroke-width="2"/>
+      <text x="130" y="160" font-family="Comic Sans MS, cursive" font-size="60" font-weight="700" fill="#713f12" text-anchor="middle">123</text>
+    </g>
+  </svg>`,
+
+  5: () => `<svg viewBox="0 0 512 512" shape-rendering="crispEdges">
+    <rect width="512" height="512" rx="110" fill="#0f172a"/>
+    <g transform="translate(96 96)">
+      <rect x="0" y="0" width="80" height="80" fill="#ef4444"/>
+      <rect x="80" y="0" width="80" height="80" fill="#22c55e"/>
+      <rect x="160" y="0" width="80" height="80" fill="#3b82f6"/>
+      <rect x="240" y="0" width="80" height="80" fill="#facc15"/>
+      <rect x="0" y="80" width="80" height="80" fill="#a855f7"/>
+      <rect x="80" y="80" width="80" height="80" fill="#06b6d4"/>
+      <rect x="160" y="80" width="80" height="80" fill="#f97316"/>
+      <rect x="240" y="80" width="80" height="80" fill="#ec4899"/>
+      <rect x="0" y="160" width="80" height="80" fill="#10b981"/>
+      <rect x="80" y="160" width="80" height="80" fill="#eab308"/>
+      <rect x="160" y="160" width="80" height="80" fill="#f43f5e"/>
+      <rect x="240" y="160" width="80" height="80" fill="#8b5cf6"/>
+      <rect x="0" y="240" width="80" height="80" fill="#06b6d4"/>
+      <rect x="80" y="240" width="80" height="80" fill="#84cc16"/>
+      <rect x="160" y="240" width="80" height="80" fill="#ec4899"/>
+      <rect x="240" y="240" width="80" height="80" fill="#f59e0b"/>
+    </g>
+  </svg>`,
+
+  6: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#fafaf9"/>
+    <path d="M 256 120 C 160 120, 100 200, 100 280 C 100 380, 200 420, 280 400 C 380 380, 420 300, 400 220 C 380 160, 320 130, 280 140"
+          stroke="#1c1917" stroke-width="36" fill="none" stroke-linecap="round"/>
+    <circle cx="280" cy="140" r="10" fill="#1c1917"/>
+  </svg>`,
+
+  7: () => `<svg viewBox="0 0 512 512">
+    <defs>
+      <linearGradient id="g7a" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#ec4899"/><stop offset="100%" stop-color="#f97316"/>
+      </linearGradient>
+      <linearGradient id="g7b" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#ec4899"/>
+      </linearGradient>
+      <linearGradient id="g7c" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/>
+      </linearGradient>
+      <linearGradient id="g7d" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#06b6d4"/><stop offset="100%" stop-color="#3b82f6"/>
+      </linearGradient>
+      <linearGradient id="g7e" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#06b6d4"/>
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="110" fill="#18181b"/>
+    <rect x="80" y="340" width="50" height="100" rx="12" fill="url(#g7a)"/>
+    <rect x="162" y="240" width="50" height="200" rx="12" fill="url(#g7b)"/>
+    <rect x="244" y="140" width="50" height="300" rx="12" fill="url(#g7c)"/>
+    <rect x="326" y="200" width="50" height="240" rx="12" fill="url(#g7d)"/>
+    <rect x="408" y="280" width="50" height="160" rx="12" fill="url(#g7e)"/>
+  </svg>`,
+
+  8: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#292524"/>
+    <rect x="80" y="80" width="160" height="160" rx="20" fill="#fb923c"/>
+    <rect x="272" y="80" width="160" height="100" rx="20" fill="#a3e635"/>
+    <rect x="272" y="212" width="160" height="60" rx="20" fill="#fde047"/>
+    <rect x="80" y="272" width="100" height="160" rx="20" fill="#22d3ee"/>
+    <rect x="212" y="272" width="100" height="160" rx="20" fill="#f472b6"/>
+    <rect x="344" y="304" width="88" height="128" rx="20" fill="#c084fc"/>
+  </svg>`,
+
+  9: () => `<svg viewBox="0 0 512 512">
+    <defs><linearGradient id="g9" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient></defs>
+    <rect width="512" height="512" rx="110" fill="#e0f2fe"/>
+    <path d="M 100 280 L 420 120 L 280 300 L 420 120 L 340 380 L 280 300 Z"
+          fill="url(#g9)" stroke="#1e40af" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M 280 300 L 340 380" stroke="#1e40af" stroke-width="4"/>
+    <path d="M 100 280 L 420 120" stroke-dasharray="6 8" stroke="#60a5fa" stroke-width="2" fill="none" opacity="0.6"/>
+  </svg>`,
+
+  10: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#020617"/>
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="6" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <g stroke="#ec4899" stroke-width="4" fill="none" filter="url(#glow)">
+      <line x1="80" y1="128" x2="432" y2="128"/>
+      <line x1="80" y1="224" x2="432" y2="224"/>
+      <line x1="80" y1="320" x2="432" y2="320"/>
+      <line x1="80" y1="416" x2="432" y2="416"/>
+    </g>
+    <g stroke="#06b6d4" stroke-width="4" fill="none" filter="url(#glow)">
+      <line x1="128" y1="80" x2="128" y2="432"/>
+      <line x1="224" y1="80" x2="224" y2="432"/>
+      <line x1="320" y1="80" x2="320" y2="432"/>
+      <line x1="416" y1="80" x2="416" y2="432"/>
+    </g>
+  </svg>`,
+
+  11: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#451a03"/>
+    <rect x="80" y="80" width="352" height="352" rx="20" fill="#78350f" stroke="#fbbf24" stroke-width="6"/>
+    <line x1="100" y1="180" x2="412" y2="180" stroke="#fbbf24" stroke-width="4"/>
+    <line x1="100" y1="280" x2="412" y2="280" stroke="#fbbf24" stroke-width="4"/>
+    <line x1="100" y1="380" x2="412" y2="380" stroke="#fbbf24" stroke-width="4"/>
+    <g><circle cx="150" cy="180" r="22" fill="#ef4444"/><circle cx="200" cy="180" r="22" fill="#ef4444"/><circle cx="340" cy="180" r="22" fill="#f97316"/></g>
+    <g><circle cx="150" cy="280" r="22" fill="#22c55e"/><circle cx="260" cy="280" r="22" fill="#22c55e"/><circle cx="310" cy="280" r="22" fill="#22c55e"/><circle cx="360" cy="280" r="22" fill="#84cc16"/></g>
+    <g><circle cx="150" cy="380" r="22" fill="#3b82f6"/><circle cx="200" cy="380" r="22" fill="#3b82f6"/><circle cx="250" cy="380" r="22" fill="#3b82f6"/></g>
+  </svg>`,
+
+  12: () => `<svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="110" fill="#0f172a"/>
+    <line x1="60" y1="256" x2="180" y2="256" stroke="white" stroke-width="4"/>
+    <polygon points="180,120 380,256 180,392" fill="rgba(255,255,255,0.1)" stroke="white" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="180" stroke="#ef4444" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="210" stroke="#f97316" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="240" stroke="#eab308" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="270" stroke="#22c55e" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="300" stroke="#3b82f6" stroke-width="4"/>
+    <line x1="380" y1="256" x2="460" y2="330" stroke="#8b5cf6" stroke-width="4"/>
+  </svg>`
+};
+
+// Render each icon at each size
+for (let i = 1; i <= 12; i++) {
+  const svg = icons[i]();
+  document.getElementById(`i${i}a`).innerHTML = svg;
+  document.getElementById(`i${i}b`).innerHTML = svg;
+  document.getElementById(`i${i}c`).innerHTML = svg;
+}
+</script>
+
+</body>
+</html>

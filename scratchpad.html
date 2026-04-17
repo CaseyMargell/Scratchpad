@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e1e2e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<title>Scratchpad</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --bg-surface: #181825;
+    --bg-input: #313244;
+    --border: #313244;
+    --border-input: #45475a;
+    --text: #cdd6f4;
+    --text-muted: #7f849c;
+    --text-subtle: #a6adc8;
+    --accent: #89b4fa;
+    --range-bg: rgba(137, 180, 250, 0.1);
+  }
+
+  body.light {
+    --bg: #eff1f5;
+    --bg-surface: #e6e9ef;
+    --bg-input: #ffffff;
+    --border: #ccd0da;
+    --border-input: #bcc0cc;
+    --text: #4c4f69;
+    --text-muted: #8c8fa1;
+    --text-subtle: #6c6f85;
+    --accent: #1e66f5;
+    --range-bg: rgba(30, 102, 245, 0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .toolbar .cell-ref {
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    padding: 2px 4px;
+    color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    width: 36px;
+    text-align: center;
+  }
+
+  .toolbar .formula-bar {
+    flex: 1;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    padding: 2px 8px;
+    color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    outline: none;
+    min-width: 0;
+  }
+
+  .toolbar .formula-bar:focus {
+    border-color: var(--accent);
+  }
+
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .icon-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    color: var(--text-muted);
+    width: 26px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+
+  .icon-btn:hover { background: var(--border-input); color: var(--text); }
+
+  .icon-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+  .theme-btn .icon-sun { display: block; }
+  .theme-btn .icon-moon { display: none; }
+  body.light .theme-btn .icon-sun { display: none; }
+  body.light .theme-btn .icon-moon { display: block; }
+
+  .btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 2px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.15s;
+  }
+
+  .btn:hover { background: var(--border-input); }
+
+  .grid-wrapper {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: max-content;
+  }
+
+  th, td {
+    border: 1px solid var(--border);
+    text-align: left;
+    font-size: 13px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  th {
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: center;
+    position: sticky;
+    z-index: 1;
+  }
+
+  .col-header {
+    top: 0;
+    width: 75px;
+    padding: 4px 8px;
+    position: relative;
+  }
+
+  .col-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 3;
+  }
+
+  .col-resize-handle:hover,
+  .col-resize-handle.active {
+    background: var(--accent);
+  }
+
+  .row-header {
+    left: 0;
+    width: 36px;
+    min-width: 36px;
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    width: 36px;
+    min-width: 36px;
+    background: var(--bg-surface);
+  }
+
+  td {
+    padding: 0;
+    height: 28px;
+    background: var(--bg);
+    position: relative;
+  }
+
+  td.selected {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    z-index: 1;
+  }
+
+  td.in-range {
+    background: var(--range-bg);
+  }
+
+  td.formula-ref {
+    outline: 2px solid #f38ba8;
+    outline-offset: -1px;
+    background: rgba(243, 139, 168, 0.1);
+  }
+
+  td .cell-display {
+    padding: 4px 8px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: cell;
+  }
+
+  td .cell-display.number {
+    text-align: right;
+  }
+
+  td .cell-edit {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    border: none;
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 13px;
+    padding: 4px 8px;
+    z-index: 2;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 10px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-bar .stats span {
+    margin-left: 16px;
+  }
+
+  .status-bar .stats span strong {
+    color: var(--text-subtle);
+    font-weight: 500;
+  }
+
+  #fileInput { display: none; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <input class="cell-ref" id="cellRef" readonly>
+  <input class="formula-bar" id="formulaBar" placeholder="Value or formula (=A1+B1)" spellcheck="false">
+  <div class="toolbar-actions">
+    <button class="icon-btn" id="saveBtn" title="Save as .xlsx">
+      <svg viewBox="0 0 16 16"><path d="M2 2a1 1 0 011-1h7.586a1 1 0 01.707.293l2.414 2.414a1 1 0 01.293.707V14a1 1 0 01-1 1H3a1 1 0 01-1-1V2zm3 0v4h6V2.414L10.586 2H5zm6 6H5v6h6V8z"/></svg>
+    </button>
+    <button class="icon-btn" id="openBtn" title="Open .xlsx">
+      <svg viewBox="0 0 16 16"><path d="M1 3.5A1.5 1.5 0 012.5 2h3.379a1.5 1.5 0 011.06.44l.941.94H13.5A1.5 1.5 0 0115 4.88v.5H1V3.5zM1 7h14v5.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5V7z"/></svg>
+    </button>
+    <button class="icon-btn" id="clearBtn" title="Clear all cells">
+      <svg viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 016 6v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm2.5 0a.5.5 0 01.5.5v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm3 .5a.5.5 0 00-1 0v6a.5.5 0 001 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 01-1 1H13v9a2 2 0 01-2 2H5a2 2 0 01-2-2V4h-.5a1 1 0 010-2H6a1 1 0 011-1h2a1 1 0 011 1h3.5a1 1 0 011 1zM4.118 4L4 4.059V13a1 1 0 001 1h6a1 1 0 001-1V4.059L11.882 4H4.118z"/></svg>
+    </button>
+    <button class="icon-btn theme-btn" id="themeToggle" title="Toggle light/dark mode">
+      <svg class="icon-sun" viewBox="0 0 16 16"><path d="M8 1a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1A.5.5 0 018 1zm0 11a4 4 0 100-8 4 4 0 000 8zm0-1a3 3 0 110-6 3 3 0 010 6zm5.657-8.157a.5.5 0 010 .707l-.707.707a.5.5 0 11-.707-.707l.707-.707a.5.5 0 01.707 0zM3.757 11.243a.5.5 0 010 .707l-.707.707a.5.5 0 11-.707-.707l.707-.707a.5.5 0 01.707 0zM15 8a.5.5 0 01-.5.5h-1a.5.5 0 010-1h1A.5.5 0 0115 8zM3 8a.5.5 0 01-.5.5h-1a.5.5 0 010-1h1A.5.5 0 013 8zm9.243 4.243a.5.5 0 01-.707 0l-.707-.707a.5.5 0 01.707-.707l.707.707a.5.5 0 010 .707zM4.464 4.465a.5.5 0 01-.707 0l-.707-.708a.5.5 0 11.707-.707l.707.707a.5.5 0 010 .708zM8 13a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1A.5.5 0 018 13z"/></svg>
+      <svg class="icon-moon" viewBox="0 0 16 16"><path d="M6 .278a.768.768 0 01.08.858 7.208 7.208 0 00-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 01.81.316.733.733 0 01-.031.893A8.349 8.349 0 018.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 016 .278z"/></svg>
+    </button>
+  </div>
+</div>
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+
+<div class="grid-wrapper" id="gridWrapper">
+  <table id="grid"></table>
+</div>
+
+<div class="status-bar">
+  <span id="statusMsg">Ready</span>
+  <div class="stats" id="stats"></div>
+</div>
+
+<script>
+const COLS = 6;
+const ROWS = 16;
+const COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
+
+const data = {};
+const undoStack = [];
+const redoStack = [];
+const MAX_UNDO = 50;
+let selectedCell = null;
+let selectionRange = null;
+let isEditing = false;
+
+const grid = document.getElementById('grid');
+const cellRefEl = document.getElementById('cellRef');
+const formulaBar = document.getElementById('formulaBar');
+const statsEl = document.getElementById('stats');
+const statusMsg = document.getElementById('statusMsg');
+const clearBtn = document.getElementById('clearBtn');
+
+function cellId(col, row) { return `${COL_LETTERS[col]}${row + 1}`; }
+
+function parseRef(ref) {
+  const m = ref.match(/^([A-Z])(\d+)$/);
+  if (!m) return null;
+  const col = m[1].charCodeAt(0) - 65;
+  const row = parseInt(m[2]) - 1;
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+  return { col, row };
+}
+
+function getRaw(id) { return data[id]?.raw ?? ''; }
+function getVal(id) { return data[id]?.val ?? ''; }
+
+function rangeVals(s, e) {
+  const start = parseRef(s.toUpperCase());
+  const end = parseRef(e.toUpperCase());
+  if (!start || !end) return [];
+  const vals = [];
+  for (let c = Math.min(start.col, end.col); c <= Math.max(start.col, end.col); c++)
+    for (let r = Math.min(start.row, end.row); r <= Math.max(start.row, end.row); r++)
+      vals.push(getVal(cellId(c, r)));
+  return vals;
+}
+
+function resolveArg(arg, visited) {
+  const t = arg.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))
+    return t.slice(1, -1);
+  const ref = parseRef(t.toUpperCase());
+  if (ref) {
+    const id = cellId(ref.col, ref.row);
+    if (visited.has(id)) return NaN;
+    visited.add(id);
+    return data[id] ? evaluate(data[id].raw, new Set(visited)) : '';
+  }
+  const num = Number(t);
+  return isNaN(num) ? t : num;
+}
+
+function splitArgs(argsStr) {
+  const args = [];
+  let depth = 0, current = '';
+  for (const ch of argsStr) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { args.push(current); current = ''; }
+    else current += ch;
+  }
+  args.push(current);
+  return args;
+}
+
+function matchCriteria(val, criteria) {
+  if (typeof criteria === 'number') return val === criteria;
+  const cs = String(criteria);
+  const m = cs.match(/^([><=!]+)(.+)$/);
+  if (m) {
+    const num = Number(m[2]);
+    if (!isNaN(num)) {
+      if (m[1] === '>') return val > num;
+      if (m[1] === '<') return val < num;
+      if (m[1] === '>=') return val >= num;
+      if (m[1] === '<=') return val <= num;
+      if (m[1] === '<>' || m[1] === '!=') return val !== num;
+      if (m[1] === '=') return val === num;
+    }
+  }
+  return String(val).toLowerCase() === cs.toLowerCase();
+}
+
+function evaluate(raw, visited = new Set()) {
+  if (typeof raw !== 'string') return raw;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('=')) {
+    const num = Number(trimmed);
+    return trimmed === '' ? '' : isNaN(num) ? trimmed : num;
+  }
+
+  let expr = trimmed.slice(1);
+
+  // --- Range functions: FUNC(A1:B5) ---
+  expr = expr.replace(/SUM\(([A-Z]\d+):([A-Z]\d+)\)/gi, (_, s, e) => {
+    return rangeVals(s, e).filter(v => typeof v === 'number').reduce((a, b) => a + b, 0);
+  });
+
+  expr = expr.replace(/(?:AVG|AVERAGE)\(([A-Z]\d+):([A-Z]\d+)\)/gi, (_, s, e) => {
+    const nums = rangeVals(s, e).filter(v => typeof v === 'number');
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+  });
+
+  expr = expr.replace(/(MIN|MAX)\(([A-Z]\d+):([A-Z]\d+)\)/gi, (_, fn, s, e) => {
+    const nums = rangeVals(s, e).filter(v => typeof v === 'number');
+    return nums.length ? Math[fn.toUpperCase()](...nums) : 0;
+  });
+
+  expr = expr.replace(/COUNT\(([A-Z]\d+):([A-Z]\d+)\)/gi, (_, s, e) => {
+    return rangeVals(s, e).filter(v => typeof v === 'number').length;
+  });
+
+  // --- COUNTIF(range, criteria) ---
+  expr = expr.replace(/COUNTIF\(([A-Z]\d+):([A-Z]\d+)\s*,\s*([^)]+)\)/gi, (_, s, e, crit) => {
+    const criteria = resolveArg(crit, new Set(visited));
+    return rangeVals(s, e).filter(v => matchCriteria(v, criteria)).length;
+  });
+
+  // --- SUMIF(range, criteria, [sum_range]) ---
+  expr = expr.replace(/SUMIF\(([A-Z]\d+):([A-Z]\d+)\s*,\s*([^,)]+)(?:\s*,\s*([A-Z]\d+):([A-Z]\d+))?\)/gi, (_, s, e, crit, ss, se) => {
+    const criteria = resolveArg(crit, new Set(visited));
+    const testVals = rangeVals(s, e);
+    const sumVals = ss && se ? rangeVals(ss, se) : testVals;
+    let sum = 0;
+    for (let i = 0; i < testVals.length; i++) {
+      if (matchCriteria(testVals[i], criteria) && typeof sumVals[i] === 'number') sum += sumVals[i];
+    }
+    return sum;
+  });
+
+  // --- IF(condition, true_val, false_val) ---
+  expr = expr.replace(/IF\(([^,]+),([^,]+),([^)]+)\)/gi, (_, cond, tVal, fVal) => {
+    let condExpr = cond.trim();
+    let op = null, left, right;
+    for (const o of ['>=', '<=', '<>', '!=', '>', '<', '=']) {
+      const idx = condExpr.indexOf(o);
+      if (idx !== -1) {
+        op = o;
+        left = resolveArg(condExpr.slice(0, idx), new Set(visited));
+        right = resolveArg(condExpr.slice(idx + o.length), new Set(visited));
+        break;
+      }
+    }
+    let result;
+    if (op) {
+      const ln = Number(left), rn = Number(right);
+      const lv = isNaN(ln) ? left : ln, rv = isNaN(rn) ? right : rn;
+      if (op === '>' ) result = lv > rv;
+      else if (op === '<' ) result = lv < rv;
+      else if (op === '>=') result = lv >= rv;
+      else if (op === '<=') result = lv <= rv;
+      else if (op === '=' ) result = lv === rv;
+      else result = lv !== rv;
+    } else {
+      const cv = resolveArg(condExpr, new Set(visited));
+      result = !!cv && cv !== 0 && cv !== '';
+    }
+    return JSON.stringify(resolveArg(result ? tVal : fVal, new Set(visited)));
+  });
+
+  // --- CONCATENATE(a, b, ...) ---
+  expr = expr.replace(/CONCATENATE\(([^)]+)\)/gi, (_, argsStr) => {
+    const args = splitArgs(argsStr);
+    return JSON.stringify(args.map(a => {
+      const v = resolveArg(a, new Set(visited));
+      return v === '' || v === undefined ? '' : String(v);
+    }).join(''));
+  });
+
+  // --- Single-arg functions ---
+  expr = expr.replace(/ABS\(([^)]+)\)/gi, (_, a) => {
+    const v = Number(resolveArg(a, new Set(visited)));
+    return isNaN(v) ? 'NaN' : Math.abs(v);
+  });
+
+  expr = expr.replace(/SQRT\(([^)]+)\)/gi, (_, a) => {
+    const v = Number(resolveArg(a, new Set(visited)));
+    return isNaN(v) || v < 0 ? 'NaN' : Math.sqrt(v);
+  });
+
+  expr = expr.replace(/ROUND\(([^,]+),\s*([^)]+)\)/gi, (_, a, d) => {
+    const v = Number(resolveArg(a, new Set(visited)));
+    const dec = Number(resolveArg(d, new Set(visited)));
+    if (isNaN(v) || isNaN(dec)) return 'NaN';
+    const f = Math.pow(10, dec);
+    return Math.round(v * f) / f;
+  });
+
+  expr = expr.replace(/POWER\(([^,]+),\s*([^)]+)\)/gi, (_, a, b) => {
+    const base = Number(resolveArg(a, new Set(visited)));
+    const exp = Number(resolveArg(b, new Set(visited)));
+    return isNaN(base) || isNaN(exp) ? 'NaN' : Math.pow(base, exp);
+  });
+
+  expr = expr.replace(/MOD\(([^,]+),\s*([^)]+)\)/gi, (_, a, b) => {
+    const x = Number(resolveArg(a, new Set(visited)));
+    const y = Number(resolveArg(b, new Set(visited)));
+    if (isNaN(x) || isNaN(y) || y === 0) return 'NaN';
+    return ((x % y) + y) % y;
+  });
+
+  // --- Text functions ---
+  expr = expr.replace(/UPPER\(([^)]+)\)/gi, (_, a) => {
+    return JSON.stringify(String(resolveArg(a, new Set(visited))).toUpperCase());
+  });
+
+  expr = expr.replace(/LOWER\(([^)]+)\)/gi, (_, a) => {
+    return JSON.stringify(String(resolveArg(a, new Set(visited))).toLowerCase());
+  });
+
+  expr = expr.replace(/TRIM\(([^)]+)\)/gi, (_, a) => {
+    return JSON.stringify(String(resolveArg(a, new Set(visited))).trim());
+  });
+
+  expr = expr.replace(/LEN\(([^)]+)\)/gi, (_, a) => {
+    return String(resolveArg(a, new Set(visited))).length;
+  });
+
+  expr = expr.replace(/LEFT\(([^,]+),\s*([^)]+)\)/gi, (_, a, n) => {
+    const s = String(resolveArg(a, new Set(visited)));
+    const num = Number(resolveArg(n, new Set(visited)));
+    return JSON.stringify(isNaN(num) ? s : s.slice(0, num));
+  });
+
+  expr = expr.replace(/RIGHT\(([^,]+),\s*([^)]+)\)/gi, (_, a, n) => {
+    const s = String(resolveArg(a, new Set(visited)));
+    const num = Number(resolveArg(n, new Set(visited)));
+    return JSON.stringify(isNaN(num) ? s : s.slice(-num));
+  });
+
+  // --- Date functions ---
+  expr = expr.replace(/TODAY\(\)/gi, () => {
+    const d = new Date();
+    return JSON.stringify(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  });
+
+  expr = expr.replace(/NOW\(\)/gi, () => {
+    return JSON.stringify(new Date().toLocaleString());
+  });
+
+  // --- & concatenation operator ---
+  expr = expr.replace(/([A-Z]\d+)\s*&\s*/gi, (_, ref) => {
+    const v = resolveArg(ref, new Set(visited));
+    return JSON.stringify(v === '' || v === undefined ? '' : String(v)) + '+';
+  });
+
+  // Cell references (numeric context)
+  expr = expr.replace(/([A-Z])(\d+)/g, (match) => {
+    const id = match.toUpperCase();
+    if (visited.has(id)) return 'NaN';
+    visited.add(id);
+    const v = data[id] ? evaluate(data[id].raw, new Set(visited)) : 0;
+    return typeof v === 'number' ? v : isNaN(Number(v)) ? 0 : Number(v);
+  });
+
+  try {
+    const result = Function('"use strict"; return (' + expr + ')')();
+    return typeof result === 'number' && !isFinite(result) ? '#ERR' : result;
+  } catch {
+    return '#ERR';
+  }
+}
+
+function recalcAll() {
+  for (const id in data) {
+    data[id].val = evaluate(data[id].raw);
+  }
+}
+
+function setCell(id, raw) {
+  if (raw === '' || raw === undefined) {
+    delete data[id];
+  } else {
+    data[id] = { raw, val: evaluate(raw) };
+  }
+  recalcAll();
+}
+
+function snapshot() {
+  const snap = {};
+  for (const id in data) snap[id] = { raw: data[id].raw };
+  return JSON.stringify(snap);
+}
+
+function restoreSnapshot(json) {
+  for (const id in data) delete data[id];
+  const snap = JSON.parse(json);
+  for (const id in snap) data[id] = { raw: snap[id].raw, val: '' };
+  recalcAll();
+  renderAll();
+  if (selectedCell) {
+    formulaBar.value = getRaw(selectedCell);
+    updateStats();
+  }
+}
+
+function pushUndo() {
+  const snap = snapshot();
+  if (undoStack.length && undoStack[undoStack.length - 1] === snap) return;
+  undoStack.push(snap);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(snapshot());
+  restoreSnapshot(undoStack.pop());
+  saveState();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(snapshot());
+  restoreSnapshot(redoStack.pop());
+  saveState();
+}
+
+function renderCell(id) {
+  const td = document.querySelector(`td[data-id="${id}"]`);
+  if (!td) return;
+  const display = td.querySelector('.cell-display');
+  const val = getVal(id);
+  const displayVal = val === '' || val === undefined ? '' : String(val);
+  display.textContent = displayVal;
+  display.className = 'cell-display' + (typeof val === 'number' ? ' number' : '');
+}
+
+function renderAll() {
+  document.querySelectorAll('td[data-id]').forEach(td => {
+    renderCell(td.dataset.id);
+  });
+}
+
+function buildGrid() {
+  let html = '<thead><tr><th class="corner"></th>';
+  for (let c = 0; c < COL_LETTERS.length; c++) html += `<th class="col-header" data-col-idx="${c}">${COL_LETTERS[c]}<div class="col-resize-handle" data-resize-col="${c}"></div></th>`;
+  html += '</tr></thead><tbody>';
+  for (let r = 0; r < ROWS; r++) {
+    html += `<tr><th class="row-header">${r + 1}</th>`;
+    for (let c = 0; c < COLS; c++) {
+      const id = cellId(c, r);
+      html += `<td data-id="${id}" data-col="${c}" data-row="${r}"><div class="cell-display"></div></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  grid.innerHTML = html;
+}
+
+function selectCell(id, clearRange = true) {
+  if (selectedCell) {
+    const prev = document.querySelector(`td[data-id="${selectedCell}"]`);
+    if (prev) prev.classList.remove('selected');
+  }
+  if (clearRange) clearSelectionRange();
+  selectedCell = id;
+  const td = document.querySelector(`td[data-id="${id}"]`);
+  if (td) {
+    td.classList.add('selected');
+    td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  cellRefEl.value = id;
+  formulaBar.value = getRaw(id);
+  updateStats();
+}
+
+function clearSelectionRange() {
+  document.querySelectorAll('.in-range').forEach(el => el.classList.remove('in-range'));
+  selectionRange = null;
+}
+
+function setSelectionRange(startId, endId) {
+  clearSelectionRange();
+  const s = parseRef(startId);
+  const e = parseRef(endId);
+  if (!s || !e) return;
+  const minC = Math.min(s.col, e.col), maxC = Math.max(s.col, e.col);
+  const minR = Math.min(s.row, e.row), maxR = Math.max(s.row, e.row);
+  selectionRange = { minC, maxC, minR, maxR };
+  for (let c = minC; c <= maxC; c++) {
+    for (let r = minR; r <= maxR; r++) {
+      const td = document.querySelector(`td[data-id="${cellId(c, r)}"]`);
+      if (td) td.classList.add('in-range');
+    }
+  }
+  updateStats();
+}
+
+function updateStats() {
+  let cells = [];
+  if (selectionRange) {
+    const { minC, maxC, minR, maxR } = selectionRange;
+    for (let c = minC; c <= maxC; c++)
+      for (let r = minR; r <= maxR; r++)
+        cells.push(cellId(c, r));
+  } else if (selectedCell) {
+    cells = [selectedCell];
+  }
+
+  const nums = cells.map(id => getVal(id)).filter(v => typeof v === 'number');
+  if (nums.length > 1) {
+    const sum = nums.reduce((a, b) => a + b, 0);
+    const avg = sum / nums.length;
+    statsEl.innerHTML = `<span>Sum: <strong>${fmtNum(sum)}</strong></span><span>Avg: <strong>${fmtNum(avg)}</strong></span><span>Count: <strong>${nums.length}</strong></span>`;
+  } else {
+    statsEl.innerHTML = '';
+  }
+}
+
+function fmtNum(n) {
+  return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+function readFromClipboard() {
+  return new Promise((resolve) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.readText().then(resolve).catch(() => resolve(''));
+    } else {
+      const handler = (e) => {
+        const text = e.clipboardData.getData('text/plain');
+        e.preventDefault();
+        document.removeEventListener('paste', handler);
+        resolve(text);
+      };
+      document.addEventListener('paste', handler);
+      document.execCommand('paste');
+    }
+  });
+}
+
+let formulaSelecting = false;
+let refCursorCol = -1;
+let refCursorRow = -1;
+let arrowRefActive = false;
+
+function isFormulaMode() {
+  if (!isEditing) return false;
+  const input = document.querySelector('.cell-edit');
+  return input && input.value.trimStart().startsWith('=');
+}
+
+function atOperatorBoundary(input) {
+  const pos = input.selectionStart;
+  if (pos === 0) return false;
+  const before = input.value.slice(0, pos);
+  const lastChar = before.trim().slice(-1);
+  return '=+-*/(<>,'.includes(lastChar);
+}
+
+function clearFormulaRefs() {
+  document.querySelectorAll('.formula-ref').forEach(el => el.classList.remove('formula-ref'));
+}
+
+function highlightFormulaRange(startId, endId) {
+  clearFormulaRefs();
+  const s = parseRef(startId);
+  const e = parseRef(endId || startId);
+  if (!s || !e) return;
+  for (let c = Math.min(s.col, e.col); c <= Math.max(s.col, e.col); c++)
+    for (let r = Math.min(s.row, e.row); r <= Math.max(s.row, e.row); r++) {
+      const td = document.querySelector(`td[data-id="${cellId(c, r)}"]`);
+      if (td) td.classList.add('formula-ref');
+    }
+}
+
+function insertRefIntoFormula(ref) {
+  const input = document.querySelector('.cell-edit');
+  if (!input) return;
+  const pos = input.selectionStart;
+  const val = input.value;
+  const before = val.slice(0, formulaInsertPos);
+  const after = val.slice(formulaInsertPos + formulaInsertLen);
+  input.value = before + ref + after;
+  formulaInsertLen = ref.length;
+  input.selectionStart = input.selectionEnd = formulaInsertPos + ref.length;
+  formulaBar.value = input.value;
+}
+
+let formulaInsertPos = 0;
+let formulaInsertLen = 0;
+
+function startEdit(id, initialValue) {
+  if (isEditing) stopEdit(true);
+  isEditing = true;
+  formulaInsertPos = 0;
+  formulaInsertLen = 0;
+  const td = document.querySelector(`td[data-id="${id}"]`);
+  if (!td) return;
+  const input = document.createElement('input');
+  input.className = 'cell-edit';
+  input.value = initialValue !== undefined ? initialValue : getRaw(id);
+  td.appendChild(input);
+  input.focus();
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; stopEdit(true); moveSelection(0, 1); }
+    else if (e.key === 'Tab') { e.preventDefault(); clearFormulaRefs(); arrowRefActive = false; stopEdit(true); moveSelection(e.shiftKey ? -1 : 1, 0); }
+    else if (e.key === 'Escape') { clearFormulaRefs(); arrowRefActive = false; stopEdit(false); }
+    else if (isFormulaMode() && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      if (arrowRefActive || atOperatorBoundary(input)) {
+        e.preventDefault();
+        if (!arrowRefActive) {
+          const pos = parseRef(selectedCell);
+          refCursorCol = pos.col;
+          refCursorRow = pos.row;
+          formulaInsertPos = input.selectionStart;
+          formulaInsertLen = 0;
+          arrowRefActive = true;
+        }
+        if (e.key === 'ArrowUp') refCursorRow = Math.max(0, refCursorRow - 1);
+        else if (e.key === 'ArrowDown') refCursorRow = Math.min(ROWS - 1, refCursorRow + 1);
+        else if (e.key === 'ArrowLeft') refCursorCol = Math.max(0, refCursorCol - 1);
+        else if (e.key === 'ArrowRight') refCursorCol = Math.min(COLS - 1, refCursorCol + 1);
+        const ref = cellId(refCursorCol, refCursorRow);
+        insertRefIntoFormula(ref);
+        highlightFormulaRange(ref, ref);
+      }
+    }
+  });
+
+  input.addEventListener('keypress', () => {
+    if (arrowRefActive) {
+      arrowRefActive = false;
+      clearFormulaRefs();
+      const end = formulaInsertPos + formulaInsertLen;
+      formulaInsertPos = end;
+      formulaInsertLen = 0;
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    if (formulaSelecting) return;
+    if (isEditing) { clearFormulaRefs(); stopEdit(true); }
+  });
+  formulaBar.value = input.value;
+  input.addEventListener('input', () => {
+    formulaBar.value = input.value;
+    formulaInsertPos = input.selectionStart;
+    formulaInsertLen = 0;
+  });
+  input.addEventListener('click', () => {
+    formulaInsertPos = input.selectionStart;
+    formulaInsertLen = 0;
+  });
+}
+
+function stopEdit(save) {
+  if (!isEditing) return;
+  isEditing = false;
+  const input = document.querySelector('.cell-edit');
+  if (!input) return;
+  if (save && input.value !== getRaw(selectedCell)) {
+    pushUndo();
+    setCell(selectedCell, input.value);
+    renderAll();
+  }
+  input.remove();
+  formulaBar.value = getRaw(selectedCell);
+  updateStats();
+}
+
+function moveSelection(dc, dr) {
+  if (!selectedCell) { selectCell('A1'); return; }
+  const pos = parseRef(selectedCell);
+  if (!pos) return;
+  const nc = Math.max(0, Math.min(COLS - 1, pos.col + dc));
+  const nr = Math.max(0, Math.min(ROWS - 1, pos.row + dr));
+  selectCell(cellId(nc, nr));
+}
+
+// --- Events ---
+
+grid.addEventListener('mousedown', (e) => {
+  const td = e.target.closest('td[data-id]');
+  if (!td) return;
+
+  if (isFormulaMode()) {
+    e.preventDefault();
+    e.stopPropagation();
+    formulaSelecting = true;
+    const input = document.querySelector('.cell-edit');
+    formulaInsertPos = input.selectionStart;
+    formulaInsertLen = 0;
+    const startId = td.dataset.id;
+    insertRefIntoFormula(startId);
+    highlightFormulaRange(startId, startId);
+
+    const onMove = (me) => {
+      const over = document.elementFromPoint(me.clientX, me.clientY)?.closest('td[data-id]');
+      if (over) {
+        const endId = over.dataset.id;
+        const ref = endId === startId ? startId : startId + ':' + endId;
+        insertRefIntoFormula(ref);
+        highlightFormulaRange(startId, endId);
+      }
+    };
+    const onUp = () => {
+      formulaSelecting = false;
+      const input = document.querySelector('.cell-edit');
+      if (input) {
+        input.focus();
+        const end = formulaInsertPos + formulaInsertLen;
+        input.selectionStart = input.selectionEnd = end;
+        formulaInsertPos = end;
+        formulaInsertLen = 0;
+      }
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return;
+  }
+
+  if (isEditing) stopEdit(true);
+  selectCell(td.dataset.id);
+
+  if (e.shiftKey && selectedCell) return;
+
+  const startId = td.dataset.id;
+  const onMove = (me) => {
+    const over = document.elementFromPoint(me.clientX, me.clientY)?.closest('td[data-id]');
+    if (over && over.dataset.id !== startId) {
+      setSelectionRange(startId, over.dataset.id);
+    }
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+
+grid.addEventListener('dblclick', (e) => {
+  const td = e.target.closest('td[data-id]');
+  if (td) startEdit(td.dataset.id);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement === formulaBar) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      pushUndo();
+      setCell(selectedCell, formulaBar.value);
+      recalcAll();
+      renderAll();
+      formulaBar.blur();
+      moveSelection(0, 1);
+    } else if (e.key === 'Escape') {
+      formulaBar.value = getRaw(selectedCell);
+      formulaBar.blur();
+    }
+    return;
+  }
+
+  if (isEditing) return;
+
+  if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(0, -1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(0, 1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); moveSelection(-1, 0); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); moveSelection(1, 0); }
+  else if (e.key === 'Tab') { e.preventDefault(); moveSelection(e.shiftKey ? -1 : 1, 0); }
+  else if (e.key === 'Enter') { e.preventDefault(); startEdit(selectedCell); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    pushUndo();
+    if (selectionRange) {
+      const { minC, maxC, minR, maxR } = selectionRange;
+      for (let c = minC; c <= maxC; c++)
+        for (let r = minR; r <= maxR; r++)
+          setCell(cellId(c, r), '');
+      renderAll();
+      clearSelectionRange();
+    } else if (selectedCell) {
+      setCell(selectedCell, '');
+      renderAll();
+    }
+  }
+  else if (e.key === 'F2') { e.preventDefault(); startEdit(selectedCell); }
+  else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    startEdit(selectedCell, e.key);
+  }
+
+  // Ctrl+C copy
+  if (e.ctrlKey && e.key === 'c') {
+    e.preventDefault();
+    let text = '';
+    if (selectionRange) {
+      const { minC, maxC, minR, maxR } = selectionRange;
+      for (let r = minR; r <= maxR; r++) {
+        const row = [];
+        for (let c = minC; c <= maxC; c++) {
+          const v = getVal(cellId(c, r));
+          row.push(v === '' || v === undefined ? '' : String(v));
+        }
+        text += row.join('\t') + '\n';
+      }
+    } else if (selectedCell) {
+      const v = getVal(selectedCell);
+      text = v === '' || v === undefined ? '' : String(v);
+    }
+    copyToClipboard(text);
+    statusMsg.textContent = 'Copied';
+    setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+  }
+
+  // Ctrl+V paste
+  if (e.ctrlKey && e.key === 'v') {
+    e.preventDefault();
+    pushUndo();
+    readFromClipboard().then(text => {
+      if (!selectedCell || !text) return;
+      const pos = parseRef(selectedCell);
+      if (!pos) return;
+      const lines = text.split('\n').filter((l, i, a) => i < a.length - 1 || l.trim());
+      for (let r = 0; r < lines.length && pos.row + r < ROWS; r++) {
+        const cols = lines[r].split('\t');
+        for (let c = 0; c < cols.length && pos.col + c < COLS; c++) {
+          setCell(cellId(pos.col + c, pos.row + r), cols[c]);
+        }
+      }
+      recalcAll();
+      renderAll();
+      statusMsg.textContent = 'Pasted';
+      setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+    });
+  }
+
+  // Ctrl+Z undo
+  if (e.ctrlKey && e.key === 'z') {
+    e.preventDefault();
+    undo();
+    statusMsg.textContent = 'Undo';
+    setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+  }
+
+  // Ctrl+Y redo
+  if (e.ctrlKey && e.key === 'y') {
+    e.preventDefault();
+    redo();
+    statusMsg.textContent = 'Redo';
+    setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+  }
+
+  // Ctrl+A select all
+  if (e.ctrlKey && e.key === 'a') {
+    e.preventDefault();
+    selectCell('A1', false);
+    setSelectionRange('A1', cellId(COLS - 1, ROWS - 1));
+  }
+});
+
+// --- Column resize ---
+grid.addEventListener('mousedown', (e) => {
+  const handle = e.target.closest('.col-resize-handle');
+  if (!handle) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const colIdx = parseInt(handle.dataset.resizeCol);
+  const th = handle.parentElement;
+  const startX = e.clientX;
+  const startW = th.offsetWidth;
+  handle.classList.add('active');
+  document.body.style.cursor = 'col-resize';
+
+  const onMove = (me) => {
+    const newW = Math.max(40, startW + me.clientX - startX);
+    th.style.width = newW + 'px';
+    grid.querySelectorAll(`td[data-col="${colIdx}"]`).forEach(td => {
+      td.style.width = newW + 'px';
+    });
+  };
+  const onUp = () => {
+    handle.classList.remove('active');
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+
+formulaBar.addEventListener('focus', () => {
+  if (isEditing) stopEdit(true);
+});
+
+clearBtn.addEventListener('click', () => {
+  if (!confirm('Clear all cells?')) return;
+  pushUndo();
+  for (const id in data) delete data[id];
+  renderAll();
+  if (selectedCell) {
+    formulaBar.value = '';
+    updateStats();
+  }
+  statusMsg.textContent = 'Cleared';
+  setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+});
+
+// --- Save as .xlsx ---
+const saveBtn = document.getElementById('saveBtn');
+saveBtn.addEventListener('click', () => {
+  const aoa = [];
+  for (let r = 0; r < ROWS; r++) {
+    const row = [];
+    for (let c = 0; c < COLS; c++) {
+      const v = getVal(cellId(c, r));
+      row.push(v === '' || v === undefined ? null : v);
+    }
+    aoa.push(row);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Scratchpad');
+  XLSX.writeFile(wb, 'scratchpad.xlsx');
+  statusMsg.textContent = 'Saved';
+  setTimeout(() => statusMsg.textContent = 'Ready', 1500);
+});
+
+// --- Open .xlsx ---
+const openBtn = document.getElementById('openBtn');
+const fileInput = document.getElementById('fileInput');
+openBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      pushUndo();
+      for (const id in data) delete data[id];
+      for (let r = 0; r < Math.min(aoa.length, ROWS); r++) {
+        for (let c = 0; c < Math.min((aoa[r] || []).length, COLS); c++) {
+          const v = aoa[r][c];
+          if (v !== '' && v !== null && v !== undefined) {
+            setCell(cellId(c, r), String(v));
+          }
+        }
+      }
+      recalcAll();
+      renderAll();
+      if (selectedCell) formulaBar.value = getRaw(selectedCell);
+      updateStats();
+      statusMsg.textContent = 'Opened: ' + file.name;
+      setTimeout(() => statusMsg.textContent = 'Ready', 2000);
+    } catch {
+      statusMsg.textContent = 'Error reading file';
+      setTimeout(() => statusMsg.textContent = 'Ready', 2000);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  fileInput.value = '';
+});
+
+// --- Theme toggle ---
+const themeToggle = document.getElementById('themeToggle');
+function applyTheme(light) {
+  document.body.classList.toggle('light', light);
+  try { localStorage.setItem('scratchpad_theme', light ? 'light' : 'dark'); } catch {}
+}
+themeToggle.addEventListener('click', () => {
+  applyTheme(!document.body.classList.contains('light'));
+});
+
+// --- LocalStorage persistence ---
+function saveState() {
+  try { localStorage.setItem('scratchpad_data', JSON.stringify(data)); } catch {}
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('scratchpad_data');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      Object.assign(data, parsed);
+      recalcAll();
+    }
+  } catch {}
+}
+
+// Auto-save on changes
+const origSetCell = setCell;
+setCell = function(id, raw) {
+  origSetCell(id, raw);
+  saveState();
+};
+
+// Init
+buildGrid();
+loadState();
+renderAll();
+selectCell('A1');
+try {
+  if (localStorage.getItem('scratchpad_theme') === 'light') applyTheme(true);
+} catch {}
+
+// Persist window size and position
+try {
+  const savedWin = JSON.parse(localStorage.getItem('scratchpad_window'));
+  if (savedWin) {
+    window.resizeTo(savedWin.w, savedWin.h);
+    window.moveTo(savedWin.x, savedWin.y);
+  } else {
+    const gridW = 36 + (75 * COLS) + 80;
+    const gridH = 28 + (28 * ROWS) + 160;
+    window.resizeTo(gridW, gridH);
+  }
+} catch {}
+
+window.addEventListener('beforeunload', () => {
+  saveState();
+  try {
+    localStorage.setItem('scratchpad_window', JSON.stringify({
+      w: window.outerWidth, h: window.outerHeight,
+      x: window.screenX, y: window.screenY
+    }));
+  } catch {}
+});
+
+// Register service worker for offline + auto-update
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
