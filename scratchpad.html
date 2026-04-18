@@ -471,7 +471,16 @@
           <button class="seg-btn" data-size="large">Large</button>
         </div>
       </div>
-      <div class="config-row">
+      <div class="config-row" id="nativeHotkeyRow" style="display:none;">
+        <div>
+          <div class="config-label">Global hotkey</div>
+          <div class="config-hint">Click the field and press your new shortcut</div>
+        </div>
+        <div class="config-control">
+          <button class="kbd" id="hotkeyCapture" style="cursor:pointer; min-width:120px;">—</button>
+        </div>
+      </div>
+      <div class="config-row" id="webHotkeyRow">
         <div>
           <div class="config-label">Launch shortcut</div>
           <div class="config-hint">Set on the Windows shortcut file properties</div>
@@ -480,6 +489,24 @@
           <span class="kbd">Ctrl</span>
           <span class="kbd">Alt</span>
           <span class="kbd">S</span>
+        </div>
+      </div>
+      <div class="config-row" id="nativeStartupRow" style="display:none;">
+        <div>
+          <div class="config-label">Start with Windows</div>
+          <div class="config-hint">Launch to the system tray on sign-in</div>
+        </div>
+        <div class="config-control">
+          <button class="seg-btn" data-startup="false">Off</button>
+          <button class="seg-btn" data-startup="true">On</button>
+        </div>
+      </div>
+      <div class="config-row" id="nativeVersionRow" style="display:none;">
+        <div>
+          <div class="config-label">Version</div>
+        </div>
+        <div class="config-control">
+          <span class="config-hint" id="versionText">—</span>
         </div>
       </div>
     </div>
@@ -1571,6 +1598,119 @@ function syncSettingsUI() {
   });
   document.querySelectorAll('[data-size]').forEach(b => {
     b.classList.toggle('active', b.dataset.size === currentSize);
+  });
+  document.querySelectorAll('[data-startup]').forEach(b => {
+    b.classList.toggle('active', (b.dataset.startup === 'true') === nativeState.runAtStartup);
+  });
+}
+
+// --- Native bridge (only active when running inside the C# app) ---
+const nativeState = {
+  runAtStartup: false,
+  hotkey: { modifiers: 3, key: 0x53 }, // Ctrl+Alt+S default
+  version: 'web'
+};
+
+const MOD_ALT = 1, MOD_CTRL = 2, MOD_SHIFT = 4, MOD_WIN = 8;
+
+function formatHotkey(mods, key) {
+  const parts = [];
+  if (mods & MOD_CTRL) parts.push('Ctrl');
+  if (mods & MOD_ALT) parts.push('Alt');
+  if (mods & MOD_SHIFT) parts.push('Shift');
+  if (mods & MOD_WIN) parts.push('Win');
+  parts.push(keyToLabel(key));
+  return parts.join(' + ');
+}
+
+function keyToLabel(vk) {
+  if (vk >= 0x30 && vk <= 0x39) return String.fromCharCode(vk);
+  if (vk >= 0x41 && vk <= 0x5A) return String.fromCharCode(vk);
+  if (vk >= 0x70 && vk <= 0x7B) return 'F' + (vk - 0x6F);
+  const map = { 0x20: 'Space', 0x0D: 'Enter', 0x09: 'Tab', 0xC0: '`',
+    0xBD: '-', 0xBB: '=', 0xDB: '[', 0xDD: ']', 0xDC: '\\', 0xBA: ';',
+    0xDE: "'", 0xBC: ',', 0xBE: '.', 0xBF: '/' };
+  return map[vk] || 'Key';
+}
+
+if (window.NativeBridge && window.NativeBridge.isNative) {
+  document.getElementById('nativeHotkeyRow').style.display = '';
+  document.getElementById('nativeStartupRow').style.display = '';
+  document.getElementById('nativeVersionRow').style.display = '';
+  document.getElementById('webHotkeyRow').style.display = 'none';
+
+  // Ask native for current settings
+  window.NativeBridge.send({ type: 'getSettings' });
+
+  // Handle incoming messages from native
+  window.chrome?.webview?.addEventListener('message', (e) => {
+    let msg = e.data;
+    if (typeof msg === 'string') {
+      try { msg = JSON.parse(msg); } catch { return; }
+    }
+    if (msg.type === 'settings') {
+      nativeState.hotkey = msg.hotkey;
+      nativeState.runAtStartup = msg.runAtStartup;
+      nativeState.version = msg.version;
+      document.getElementById('hotkeyCapture').textContent = formatHotkey(msg.hotkey.modifiers, msg.hotkey.key);
+      document.getElementById('versionText').textContent = 'v' + msg.version;
+      syncSettingsUI();
+    } else if (msg.type === 'hotkeyResult') {
+      if (!msg.success) {
+        document.getElementById('hotkeyCapture').textContent = 'Conflict — try another';
+        setTimeout(() => {
+          document.getElementById('hotkeyCapture').textContent = formatHotkey(nativeState.hotkey.modifiers, nativeState.hotkey.key);
+        }, 2000);
+      }
+    }
+  });
+
+  // Hotkey capture
+  const hotkeyBtn = document.getElementById('hotkeyCapture');
+  let capturing = false;
+  hotkeyBtn.addEventListener('click', () => {
+    capturing = true;
+    hotkeyBtn.textContent = 'Press new shortcut...';
+    hotkeyBtn.style.background = 'var(--accent)';
+    hotkeyBtn.style.color = 'white';
+  });
+  window.addEventListener('keydown', (e) => {
+    if (!capturing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      capturing = false;
+      hotkeyBtn.style.background = '';
+      hotkeyBtn.style.color = '';
+      hotkeyBtn.textContent = formatHotkey(nativeState.hotkey.modifiers, nativeState.hotkey.key);
+      return;
+    }
+    // Need at least one modifier other than just shift
+    if (!e.ctrlKey && !e.altKey && !e.metaKey) return;
+    // Ignore pure modifier keys
+    if (['Control','Alt','Shift','Meta'].includes(e.key)) return;
+    let mods = 0;
+    if (e.altKey) mods |= MOD_ALT;
+    if (e.ctrlKey) mods |= MOD_CTRL;
+    if (e.shiftKey) mods |= MOD_SHIFT;
+    if (e.metaKey) mods |= MOD_WIN;
+    const vk = e.keyCode;
+    nativeState.hotkey = { modifiers: mods, key: vk };
+    hotkeyBtn.textContent = formatHotkey(mods, vk);
+    hotkeyBtn.style.background = '';
+    hotkeyBtn.style.color = '';
+    capturing = false;
+    window.NativeBridge.send({ type: 'setHotkey', modifiers: mods, key: vk });
+  }, true);
+
+  // Startup toggle
+  document.querySelectorAll('[data-startup]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const enabled = btn.dataset.startup === 'true';
+      nativeState.runAtStartup = enabled;
+      window.NativeBridge.send({ type: 'setStartup', enabled });
+      syncSettingsUI();
+    });
   });
 }
 

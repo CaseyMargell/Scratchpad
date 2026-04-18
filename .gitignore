@@ -2,3 +2,10 @@ node_modules/
 package-lock.json
 .DS_Store
 Thumbs.db
+
+# .NET build outputs
+app/bin/
+app/obj/
+*.user
+*.suo
+.vs/
