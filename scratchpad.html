@@ -559,7 +559,7 @@ const GRID_SIZES = {
   medium: { cols: 8,  rows: 12, label: 'Medium (8 × 12)' },
   large:  { cols: 16, rows: 24, label: 'Large (16 × 24)' }
 };
-let currentSize = 'small';
+let currentSize = 'medium';
 let COLS = GRID_SIZES[currentSize].cols;
 let ROWS = GRID_SIZES[currentSize].rows;
 let COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
@@ -1615,7 +1615,7 @@ try {
           maxRow = Math.max(maxRow, parseInt(m[2]) - 1);
         }
       }
-      for (const key of ['small', 'medium', 'large']) {
+      for (const key of ['medium', 'large']) {
         if (maxCol < GRID_SIZES[key].cols && maxRow < GRID_SIZES[key].rows) {
           currentSize = key;
           break;
