@@ -272,6 +272,152 @@
   }
 
   #fileInput { display: none; }
+
+  .fab {
+    position: fixed;
+    bottom: 32px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+    z-index: 10;
+  }
+  .fab:hover { background: var(--accent); color: white; transform: scale(1.08); }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border-input);
+    border-radius: 10px;
+    min-width: 320px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    user-select: text;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 16px 18px; }
+
+  .config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .config-row:last-child { border-bottom: none; }
+  .config-label { font-size: 13px; color: var(--text); }
+  .config-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .config-control { display: flex; gap: 6px; }
+
+  .seg-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg-btn:hover { color: var(--text); }
+  .seg-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 3px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  .help-section {
+    margin-bottom: 18px;
+  }
+  .help-section h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .help-formulas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 4px 12px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .help-links { display: flex; gap: 10px; flex-wrap: wrap; }
+  .help-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    background: var(--bg-input);
+    transition: background 0.15s;
+  }
+  .help-link:hover { background: var(--border-input); }
+  .help-shortcut-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 12px;
+  }
+  .help-shortcut-list dt { text-align: right; }
+  .help-shortcut-list dd { color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -289,13 +435,114 @@
     <button class="icon-btn" id="clearBtn" title="Clear all cells">
       <svg viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 016 6v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm2.5 0a.5.5 0 01.5.5v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm3 .5a.5.5 0 00-1 0v6a.5.5 0 001 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 01-1 1H13v9a2 2 0 01-2 2H5a2 2 0 01-2-2V4h-.5a1 1 0 010-2H6a1 1 0 011-1h2a1 1 0 011 1h3.5a1 1 0 011 1zM4.118 4L4 4.059V13a1 1 0 001 1h6a1 1 0 001-1V4.059L11.882 4H4.118z"/></svg>
     </button>
-    <button class="icon-btn theme-btn" id="themeToggle" title="Toggle light/dark mode">
-      <svg class="icon-sun" viewBox="0 0 16 16"><path d="M8 1a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1A.5.5 0 018 1zm0 11a4 4 0 100-8 4 4 0 000 8zm0-1a3 3 0 110-6 3 3 0 010 6zm5.657-8.157a.5.5 0 010 .707l-.707.707a.5.5 0 11-.707-.707l.707-.707a.5.5 0 01.707 0zM3.757 11.243a.5.5 0 010 .707l-.707.707a.5.5 0 11-.707-.707l.707-.707a.5.5 0 01.707 0zM15 8a.5.5 0 01-.5.5h-1a.5.5 0 010-1h1A.5.5 0 0115 8zM3 8a.5.5 0 01-.5.5h-1a.5.5 0 010-1h1A.5.5 0 013 8zm9.243 4.243a.5.5 0 01-.707 0l-.707-.707a.5.5 0 01.707-.707l.707.707a.5.5 0 010 .707zM4.464 4.465a.5.5 0 01-.707 0l-.707-.708a.5.5 0 11.707-.707l.707.707a.5.5 0 010 .708zM8 13a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1A.5.5 0 018 13z"/></svg>
-      <svg class="icon-moon" viewBox="0 0 16 16"><path d="M6 .278a.768.768 0 01.08.858 7.208 7.208 0 00-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 01.81.316.733.733 0 01-.031.893A8.349 8.349 0 018.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 016 .278z"/></svg>
+    <button class="icon-btn" id="settingsBtn" title="Settings">
+      <svg viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 01-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 01.872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 012.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 012.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 01.872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 01-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 01-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 110-5.86 2.929 2.929 0 010 5.858z"/></svg>
     </button>
   </div>
 </div>
 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+
+<button class="fab" id="helpBtn" title="Help & info">?</button>
+
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="config-row">
+        <div>
+          <div class="config-label">Theme</div>
+        </div>
+        <div class="config-control">
+          <button class="seg-btn" data-theme="dark">Dark</button>
+          <button class="seg-btn" data-theme="light">Light</button>
+        </div>
+      </div>
+      <div class="config-row">
+        <div>
+          <div class="config-label">Grid size</div>
+          <div class="config-hint">Shrinking may remove data in cut-off cells</div>
+        </div>
+        <div class="config-control">
+          <button class="seg-btn" data-size="small">Small</button>
+          <button class="seg-btn" data-size="medium">Medium</button>
+          <button class="seg-btn" data-size="large">Large</button>
+        </div>
+      </div>
+      <div class="config-row">
+        <div>
+          <div class="config-label">Launch shortcut</div>
+          <div class="config-hint">Set on the Windows shortcut file properties</div>
+        </div>
+        <div class="config-control">
+          <span class="kbd">Ctrl</span>
+          <span class="kbd">Alt</span>
+          <span class="kbd">S</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal" style="min-width: 440px;">
+    <div class="modal-header">
+      <h2>Scratchpad — Help</h2>
+      <button class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-section">
+        <h3>Keyboard shortcuts</h3>
+        <dl class="help-shortcut-list">
+          <dt><span class="kbd">Enter</span></dt><dd>Edit cell / submit</dd>
+          <dt><span class="kbd">F2</span></dt><dd>Edit cell</dd>
+          <dt><span class="kbd">Tab</span></dt><dd>Next cell</dd>
+          <dt><span class="kbd">Esc</span></dt><dd>Cancel edit</dd>
+          <dt><span class="kbd">Ctrl+Z</span> / <span class="kbd">Ctrl+Y</span></dt><dd>Undo / Redo</dd>
+          <dt><span class="kbd">Ctrl+C</span> / <span class="kbd">Ctrl+V</span></dt><dd>Copy / Paste (Excel-compatible)</dd>
+          <dt><span class="kbd">Ctrl+A</span></dt><dd>Select all</dd>
+          <dt><span class="kbd">Shift</span>+arrow</dt><dd>Extend formula reference into range</dd>
+        </dl>
+      </div>
+      <div class="help-section">
+        <h3>Supported formulas</h3>
+        <div class="help-formulas">
+          <div>SUM(A1:A5)</div>
+          <div>AVERAGE(A1:A5)</div>
+          <div>MIN(A1:A5)</div>
+          <div>MAX(A1:A5)</div>
+          <div>COUNT(A1:A5)</div>
+          <div>COUNTIF(A1:A5, ">10")</div>
+          <div>SUMIF(A1:A5, ">10")</div>
+          <div>IF(A1&gt;5, "yes", "no")</div>
+          <div>ROUND(A1, 2)</div>
+          <div>ABS(A1)</div>
+          <div>SQRT(A1)</div>
+          <div>POWER(A1, 2)</div>
+          <div>MOD(A1, 3)</div>
+          <div>CONCATENATE(A1, B1)</div>
+          <div>UPPER(A1)</div>
+          <div>LOWER(A1)</div>
+          <div>TRIM(A1)</div>
+          <div>LEN(A1)</div>
+          <div>LEFT(A1, 3)</div>
+          <div>RIGHT(A1, 3)</div>
+          <div>TODAY()</div>
+          <div>NOW()</div>
+        </div>
+      </div>
+      <div class="help-section">
+        <h3>About</h3>
+        <div class="help-links">
+          <a class="help-link" href="https://github.com/CaseyMargell/Scratchpad" target="_blank" rel="noopener">GitHub repo</a>
+          <a class="help-link" href="https://www.linkedin.com/in/cmargell" target="_blank" rel="noopener">Casey on LinkedIn</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="grid-wrapper" id="gridWrapper">
   <table id="grid"></table>
@@ -307,9 +554,15 @@
 </div>
 
 <script>
-const COLS = 6;
-const ROWS = 16;
-const COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
+const GRID_SIZES = {
+  small:  { cols: 4,  rows: 6,  label: 'Small (4 × 6)' },
+  medium: { cols: 8,  rows: 12, label: 'Medium (8 × 12)' },
+  large:  { cols: 16, rows: 24, label: 'Large (16 × 24)' }
+};
+let currentSize = 'small';
+let COLS = GRID_SIZES[currentSize].cols;
+let ROWS = GRID_SIZES[currentSize].rows;
+let COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
 
 const data = {};
 const undoStack = [];
@@ -1232,15 +1485,94 @@ fileInput.addEventListener('change', (e) => {
   fileInput.value = '';
 });
 
-// --- Theme toggle ---
-const themeToggle = document.getElementById('themeToggle');
+// --- Theme ---
 function applyTheme(light) {
   document.body.classList.toggle('light', light);
   try { localStorage.setItem('scratchpad_theme', light ? 'light' : 'dark'); } catch {}
+  syncSettingsUI();
 }
-themeToggle.addEventListener('click', () => {
-  applyTheme(!document.body.classList.contains('light'));
+
+// --- Grid size ---
+function cellsOutsideBounds(newCols, newRows) {
+  const lost = [];
+  for (const id in data) {
+    const pos = parseRef(id);
+    if (!pos) continue;
+    if (pos.col >= newCols || pos.row >= newRows) lost.push(id);
+  }
+  return lost;
+}
+
+function applyGridSize(sizeKey) {
+  const size = GRID_SIZES[sizeKey];
+  if (!size) return;
+  if (sizeKey === currentSize) return;
+  const lost = cellsOutsideBounds(size.cols, size.rows);
+  if (lost.length > 0) {
+    const ok = confirm(
+      `Resizing to ${size.label} will remove ${lost.length} cell${lost.length === 1 ? '' : 's'} containing data.\n\nContinue?`
+    );
+    if (!ok) { syncSettingsUI(); return; }
+    pushUndo();
+    for (const id of lost) delete data[id];
+  }
+  currentSize = sizeKey;
+  COLS = size.cols;
+  ROWS = size.rows;
+  COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
+  buildGrid();
+  recalcAll();
+  renderAll();
+  selectCell('A1');
+  try { localStorage.setItem('scratchpad_gridsize', sizeKey); } catch {}
+  syncSettingsUI();
+}
+
+// --- Modals ---
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.closest('.modal-backdrop').classList.remove('open');
+  });
 });
+document.querySelectorAll('.modal-backdrop').forEach(bd => {
+  bd.addEventListener('click', (e) => {
+    if (e.target === bd) bd.classList.remove('open');
+  });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.open').forEach(bd => bd.classList.remove('open'));
+  }
+}, true);
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  syncSettingsUI();
+  openModal('settingsModal');
+});
+document.getElementById('helpBtn').addEventListener('click', () => openModal('helpModal'));
+
+document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => applyTheme(btn.dataset.theme === 'light'));
+});
+document.querySelectorAll('[data-size]').forEach(btn => {
+  btn.addEventListener('click', () => applyGridSize(btn.dataset.size));
+});
+
+function syncSettingsUI() {
+  const light = document.body.classList.contains('light');
+  document.querySelectorAll('[data-theme]').forEach(b => {
+    b.classList.toggle('active', (b.dataset.theme === 'light') === light);
+  });
+  document.querySelectorAll('[data-size]').forEach(b => {
+    b.classList.toggle('active', b.dataset.size === currentSize);
+  });
+}
 
 // --- LocalStorage persistence ---
 function saveState() {
@@ -1266,6 +1598,35 @@ setCell = function(id, raw) {
 };
 
 // Init
+try {
+  const savedSize = localStorage.getItem('scratchpad_gridsize');
+  if (savedSize && GRID_SIZES[savedSize]) {
+    currentSize = savedSize;
+  } else {
+    // No saved size — check existing data and pick smallest fitting size for backward compat
+    const saved = localStorage.getItem('scratchpad_data');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      let maxCol = 0, maxRow = 0;
+      for (const id in parsed) {
+        const m = id.match(/^([A-Z])(\d+)$/);
+        if (m) {
+          maxCol = Math.max(maxCol, m[1].charCodeAt(0) - 65);
+          maxRow = Math.max(maxRow, parseInt(m[2]) - 1);
+        }
+      }
+      for (const key of ['small', 'medium', 'large']) {
+        if (maxCol < GRID_SIZES[key].cols && maxRow < GRID_SIZES[key].rows) {
+          currentSize = key;
+          break;
+        }
+      }
+    }
+  }
+  COLS = GRID_SIZES[currentSize].cols;
+  ROWS = GRID_SIZES[currentSize].rows;
+  COL_LETTERS = Array.from({length: COLS}, (_, i) => String.fromCharCode(65 + i));
+} catch {}
 buildGrid();
 loadState();
 renderAll();
@@ -1273,6 +1634,7 @@ selectCell('A1');
 try {
   if (localStorage.getItem('scratchpad_theme') === 'light') applyTheme(true);
 } catch {}
+syncSettingsUI();
 
 // Persist window size and position
 try {
