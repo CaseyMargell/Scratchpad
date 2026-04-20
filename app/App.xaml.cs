@@ -38,7 +38,9 @@ public partial class App : Application
 
         MainWin = new MainWindow();
         MainWin.StartMinimized = startMinimized;
-        // Don't Show() here — MainWindow shows itself when WebView2 has content rendered
+        // Show the window off-screen so the HWND exists (needed for hotkey registration
+        // and taskbar entry). MainWindow will move it on-screen once WebView2 is ready.
+        MainWin.Show();
     }
 
     private async Task ListenForSecondInstance()

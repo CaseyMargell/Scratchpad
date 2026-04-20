@@ -20,11 +20,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // Start invisible — the window flashes black→white during WebView2 init
-        // if we show before content is ready. We'll call Show() once the HTML renders.
-        Visibility = Visibility.Hidden;
+        // Position off-screen during WebView2 warmup so no flash is visible.
+        // We DO show the window (HWND is needed for hotkey registration & taskbar entry).
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Left = -32000; Top = -32000;  // off-screen until we decide where to put it
+        Left = -32000; Top = -32000;
+        ShowInTaskbar = true;
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
@@ -84,7 +84,6 @@ public partial class MainWindow : Window
     private void ShowFirstTime()
     {
         RestoreWindowBounds();
-        Visibility = Visibility.Visible;
         if (StartMinimized)
         {
             WindowState = WindowState.Minimized;
@@ -93,6 +92,7 @@ public partial class MainWindow : Window
         {
             WindowState = WindowState.Normal;
             Activate();
+            Focus();
         }
     }
 
