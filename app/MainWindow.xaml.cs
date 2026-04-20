@@ -149,7 +149,34 @@ public partial class MainWindow : Window
             case "minimizeToTray":
                 Hide();
                 break;
+
+            case "resizeContent":
+                if (msg.TryGetProperty("width", out var wEl) &&
+                    msg.TryGetProperty("height", out var hEl))
+                {
+                    ResizeToContent(wEl.GetDouble(), hEl.GetDouble());
+                }
+                break;
+
+            case "resizeForGridIfUnsized":
+                if (Settings.LoadWindowBounds() == null &&
+                    msg.TryGetProperty("width", out var iw) &&
+                    msg.TryGetProperty("height", out var ih))
+                {
+                    ResizeToContent(iw.GetDouble(), ih.GetDouble());
+                }
+                break;
         }
+    }
+
+    private void ResizeToContent(double contentW, double contentH)
+    {
+        var deltaW = ActualWidth - WebView.ActualWidth;
+        var deltaH = ActualHeight - WebView.ActualHeight;
+        if (deltaW < 0 || deltaH < 0) { deltaW = 16; deltaH = 40; }
+        Width = Math.Max(MinWidth, contentW + deltaW);
+        Height = Math.Max(MinHeight, contentH + deltaH);
+        SaveWindowBounds();
     }
 
     private void SendToJs(object payload)
