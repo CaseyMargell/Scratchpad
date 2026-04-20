@@ -12,19 +12,38 @@ public partial class MainWindow : Window
 {
     private HotkeyManager? _hotkey;
     private HwndSource? _hwndSource;
+    private bool _firstShown;
+    private bool _quitting;
+
+    public bool StartMinimized { get; set; }
 
     public MainWindow()
     {
         InitializeComponent();
+        // Start invisible — the window flashes black→white during WebView2 init
+        // if we show before content is ready. We'll call Show() once the HTML renders.
+        Visibility = Visibility.Hidden;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = -32000; Top = -32000;  // off-screen until we decide where to put it
+        SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
     }
 
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        // Register global hotkey as early as possible so it works even before window is shown
+        var helper = new WindowInteropHelper(this);
+        _hwndSource = HwndSource.FromHwnd(helper.Handle);
+        _hwndSource?.AddHook(WndProc);
+
+        _hotkey = new HotkeyManager(helper.Handle);
+        var combo = Settings.LoadHotkey();
+        _hotkey.Register(combo.Modifiers, combo.Key);
+    }
+
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        RestoreWindowBounds();
-
-        // Use a user data folder next to the exe so settings persist
         var userDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Scratchpad", "WebView2");
@@ -35,15 +54,12 @@ public partial class MainWindow : Window
 
         var core = WebView.CoreWebView2;
 
-        // Extract embedded HTML resources to a temp folder and serve via virtual host
         var webRoot = ExtractWebAssets();
         core.SetVirtualHostNameToFolderMapping("scratchpad.local", webRoot,
             CoreWebView2HostResourceAccessKind.Allow);
 
-        // JS -> C# bridge
         core.WebMessageReceived += OnWebMessageReceived;
 
-        // Inject a tiny JS bridge API as soon as the page loads
         await core.AddScriptToExecuteOnDocumentCreatedAsync(@"
             window.NativeBridge = {
                 send: (msg) => window.chrome.webview.postMessage(JSON.stringify(msg)),
@@ -54,16 +70,30 @@ public partial class MainWindow : Window
             });
         ");
 
+        // Show window only after the DOM is ready, so there's no flash
+        core.DOMContentLoaded += (_, __) =>
+        {
+            if (_firstShown) return;
+            _firstShown = true;
+            Dispatcher.InvokeAsync(ShowFirstTime);
+        };
+
         core.Navigate("https://scratchpad.local/scratchpad.html");
+    }
 
-        // Hotkey registration happens once HWND is ready
-        var helper = new WindowInteropHelper(this);
-        _hwndSource = HwndSource.FromHwnd(helper.Handle);
-        _hwndSource?.AddHook(WndProc);
-
-        _hotkey = new HotkeyManager(helper.Handle);
-        var combo = Settings.LoadHotkey();
-        _hotkey.Register(combo.Modifiers, combo.Key);
+    private void ShowFirstTime()
+    {
+        RestoreWindowBounds();
+        Visibility = Visibility.Visible;
+        if (StartMinimized)
+        {
+            WindowState = WindowState.Minimized;
+        }
+        else
+        {
+            WindowState = WindowState.Normal;
+            Activate();
+        }
     }
 
     private string ExtractWebAssets()
@@ -90,7 +120,6 @@ public partial class MainWindow : Window
         {
             using var doc = JsonDocument.Parse(e.WebMessageAsJson);
             var root = doc.RootElement;
-            // WebView wraps JS strings in quotes — parse inner JSON
             if (root.ValueKind == JsonValueKind.String)
             {
                 using var inner = JsonDocument.Parse(root.GetString()!);
@@ -161,6 +190,14 @@ public partial class MainWindow : Window
                     ResizeToContent(iw.GetDouble(), ih.GetDouble());
                 }
                 break;
+
+            case "hideWindow":
+                Hide();
+                break;
+
+            case "quitApp":
+                Quit();
+                break;
         }
     }
 
@@ -192,7 +229,14 @@ public partial class MainWindow : Window
     {
         if (msg == WM_HOTKEY)
         {
-            BringToFront();
+            if (IsVisible && IsActive && WindowState != WindowState.Minimized)
+            {
+                Hide();
+            }
+            else
+            {
+                BringToFront();
+            }
             handled = true;
         }
         return IntPtr.Zero;
@@ -210,8 +254,20 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (_quitting) return;
+        // X button hides the window; process keeps running so the hotkey stays warm
+        e.Cancel = true;
+        SaveWindowBounds();
+        Hide();
+    }
+
+    public void Quit()
+    {
+        _quitting = true;
         SaveWindowBounds();
         _hotkey?.Dispose();
+        Close();
+        Application.Current.Shutdown();
     }
 
     private void RestoreWindowBounds()
@@ -221,13 +277,18 @@ public partial class MainWindow : Window
         {
             var (l, t, w, h) = b.Value;
             Left = l; Top = t; Width = w; Height = h;
-            WindowStartupLocation = WindowStartupLocation.Manual;
+        }
+        else
+        {
+            // Center on primary screen if no saved bounds
+            Left = (SystemParameters.WorkArea.Width - Width) / 2;
+            Top = (SystemParameters.WorkArea.Height - Height) / 2;
         }
     }
 
     private void SaveWindowBounds()
     {
-        if (WindowState == WindowState.Normal)
+        if (WindowState == WindowState.Normal && _firstShown)
             Settings.SaveWindowBounds(Left, Top, Width, Height);
     }
 }

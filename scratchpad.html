@@ -521,6 +521,15 @@
           <span class="config-hint" id="versionText">—</span>
         </div>
       </div>
+      <div class="config-row" id="nativeQuitRow" style="display:none;">
+        <div>
+          <div class="config-label">Close behavior</div>
+          <div class="config-hint">The X button hides the window; hotkey brings it back. Use Quit to fully exit.</div>
+        </div>
+        <div class="config-control">
+          <button class="btn" id="quitBtn" style="background: #f38ba8; color: white; border-color: #f38ba8;">Quit Scratchpad</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1699,7 +1708,14 @@ if (window.NativeBridge && window.NativeBridge.isNative) {
   document.getElementById('nativeHotkeyRow').style.display = '';
   document.getElementById('nativeStartupRow').style.display = '';
   document.getElementById('nativeVersionRow').style.display = '';
+  document.getElementById('nativeQuitRow').style.display = '';
   document.getElementById('webHotkeyRow').style.display = 'none';
+
+  document.getElementById('quitBtn').addEventListener('click', () => {
+    if (confirm('Quit Scratchpad?\n\nThe global hotkey will stop working until you relaunch.')) {
+      window.NativeBridge.send({ type: 'quitApp' });
+    }
+  });
 
   // Ask native for current settings
   window.NativeBridge.send({ type: 'getSettings' });
