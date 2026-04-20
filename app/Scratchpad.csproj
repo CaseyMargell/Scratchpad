@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>

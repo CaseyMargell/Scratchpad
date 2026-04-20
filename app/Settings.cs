@@ -97,7 +97,7 @@ public static class Settings
             if (enabled)
             {
                 var exe = Environment.ProcessPath ?? "";
-                key.SetValue(StartupRegName, $"\"{exe}\" --tray");
+                key.SetValue(StartupRegName, $"\"{exe}\" --minimized");
             }
             else
             {

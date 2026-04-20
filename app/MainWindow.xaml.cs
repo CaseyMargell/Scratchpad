@@ -12,7 +12,6 @@ public partial class MainWindow : Window
 {
     private HotkeyManager? _hotkey;
     private HwndSource? _hwndSource;
-    private bool _realClose;
 
     public MainWindow()
     {
@@ -146,10 +145,6 @@ public partial class MainWindow : Window
                 });
                 break;
 
-            case "minimizeToTray":
-                Hide();
-                break;
-
             case "resizeContent":
                 if (msg.TryGetProperty("width", out var wEl) &&
                     msg.TryGetProperty("height", out var hEl))
@@ -197,44 +192,26 @@ public partial class MainWindow : Window
     {
         if (msg == WM_HOTKEY)
         {
-            ToggleVisibility();
+            BringToFront();
             handled = true;
         }
         return IntPtr.Zero;
     }
 
-    public void ToggleVisibility()
+    public void BringToFront()
     {
-        if (IsVisible && WindowState != WindowState.Minimized && IsActive)
-        {
-            Hide();
-        }
-        else
-        {
-            Show();
-            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-            Activate();
-            Topmost = true;
-            Topmost = false;
-            Focus();
-        }
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Focus();
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_realClose) return;
-        e.Cancel = true;
-        SaveWindowBounds();
-        Hide();
-    }
-
-    public void ReallyClose()
-    {
-        _realClose = true;
         SaveWindowBounds();
         _hotkey?.Dispose();
-        Close();
-        Application.Current.Shutdown();
     }
 
     private void RestoreWindowBounds()

@@ -18,8 +18,8 @@ exe anywhere and run.
 
 ## Launch modes
 
-- Double-click the exe: window opens, tray icon appears
-- `Scratchpad.exe --tray`: starts hidden in tray (used by "Start with Windows")
+- Double-click the exe: window opens at last saved bounds
+- `Scratchpad.exe --minimized`: starts minimized to the taskbar (used by "Start with Windows")
 
 ## First-run notes
 
