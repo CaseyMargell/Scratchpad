@@ -37,7 +37,19 @@ public class TrayManager : IDisposable
 
     private Icon LoadTrayIcon()
     {
-        // Use the embedded 192px PNG converted to an icon
+        // Prefer the exe's embedded app icon (app.ico, multi-res, crisp at 16x16)
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe))
+            {
+                var icon = Icon.ExtractAssociatedIcon(exe);
+                if (icon != null) return icon;
+            }
+        }
+        catch { }
+
+        // Fallback: convert the embedded 192px PNG
         try
         {
             var asm = Assembly.GetExecutingAssembly();
@@ -50,6 +62,7 @@ public class TrayManager : IDisposable
             }
         }
         catch { }
+
         return SystemIcons.Application;
     }
 
