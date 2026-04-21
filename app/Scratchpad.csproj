@@ -9,34 +9,17 @@
     <RootNamespace>Scratchpad</RootNamespace>
     <AssemblyName>Scratchpad</AssemblyName>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="..\scratchpad.html">
-      <LogicalName>scratchpad.html</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\manifest.json">
-      <LogicalName>manifest.json</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\icon-192.png">
-      <LogicalName>icon-192.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\icon-512.png">
-      <LogicalName>icon-512.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\icon.svg">
-      <LogicalName>icon.svg</LogicalName>
-    </EmbeddedResource>
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
   </ItemGroup>
 
 </Project>

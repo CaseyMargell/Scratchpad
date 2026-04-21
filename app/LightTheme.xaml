@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Light theme overrides (applied by swapping brushes at runtime) -->
+  <SolidColorBrush x:Key="BgBrush"        Color="#eff1f5" />
+  <SolidColorBrush x:Key="BgSurfaceBrush" Color="#e6e9ef" />
+  <SolidColorBrush x:Key="BgInputBrush"   Color="#ffffff" />
+  <SolidColorBrush x:Key="BorderBrush1"   Color="#ccd0da" />
+  <SolidColorBrush x:Key="BorderInputBrush" Color="#bcc0cc" />
+  <SolidColorBrush x:Key="TextBrush"      Color="#4c4f69" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="#8c8fa1" />
+  <SolidColorBrush x:Key="TextSubtleBrush" Color="#6c6f85" />
+  <SolidColorBrush x:Key="AccentBrush"    Color="#1e66f5" />
+  <SolidColorBrush x:Key="RangeBgBrush"   Color="#dce4fc" />
+  <SolidColorBrush x:Key="FormulaRefBrush" Color="#d20f39" />
+  <SolidColorBrush x:Key="DangerBrush"    Color="#d20f39" />
+  <SolidColorBrush x:Key="HoverBrush"     Color="#ccd0da" />
+</ResourceDictionary>

@@ -1,0 +1,96 @@
+<Window x:Class="Scratchpad.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings"
+        Background="{DynamicResource BgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="Segoe UI"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+  <Grid Margin="18">
+    <StackPanel>
+      <TextBlock Text="Settings" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0" Text="Theme" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="DarkBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="Dark" Click="DarkBtn_Click" />
+          <Button x:Name="LightBtn" Style="{DynamicResource SegButton}" Content="Light" Click="LightBtn_Click" />
+        </StackPanel>
+      </Grid>
+
+      <Border BorderBrush="{DynamicResource BorderBrush1}" BorderThickness="0,0,0,1" Margin="0,6" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="Grid size" />
+          <TextBlock Text="Shrinking may remove data in cut-off cells" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="SmallBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="Small" Click="SizeBtn_Click" />
+          <Button x:Name="MediumBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="Medium" Click="SizeBtn_Click" />
+          <Button x:Name="LargeBtn" Style="{DynamicResource SegButton}" Content="Large" Click="SizeBtn_Click" />
+        </StackPanel>
+      </Grid>
+
+      <Border BorderBrush="{DynamicResource BorderBrush1}" BorderThickness="0,0,0,1" Margin="0,6" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="Global hotkey" />
+          <TextBlock Text="Click the field and press your new shortcut" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
+        </StackPanel>
+        <Button Grid.Column="1" x:Name="HotkeyBtn" Style="{DynamicResource SegButton}" MinWidth="140" Content="..." Click="HotkeyBtn_Click" />
+      </Grid>
+
+      <Border BorderBrush="{DynamicResource BorderBrush1}" BorderThickness="0,0,0,1" Margin="0,6" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="Start with Windows" />
+          <TextBlock Text="Launch minimized on sign-in" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="StartupOffBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="Off" Click="StartupOffBtn_Click" />
+          <Button x:Name="StartupOnBtn" Style="{DynamicResource SegButton}" Content="On" Click="StartupOnBtn_Click" />
+        </StackPanel>
+      </Grid>
+
+      <Border BorderBrush="{DynamicResource BorderBrush1}" BorderThickness="0,0,0,1" Margin="0,6" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="Close behavior" />
+          <TextBlock Text="X hides the window; hotkey brings it back. Use Quit to fully exit." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="1" x:Name="QuitBtn" Content="Quit Scratchpad" Padding="12,4" Click="QuitBtn_Click"
+                Background="{DynamicResource DangerBrush}" Foreground="White" BorderBrush="{DynamicResource DangerBrush}" BorderThickness="1" VerticalAlignment="Center" />
+      </Grid>
+
+      <TextBlock x:Name="VersionText" Text="" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,14,0,0" HorizontalAlignment="Right" />
+    </StackPanel>
+  </Grid>
+</Window>

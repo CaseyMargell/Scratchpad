@@ -8,17 +8,17 @@ public partial class App : Application
 {
     public static MainWindow? MainWin { get; private set; }
 
-    private const string MutexName = "Scratchpad.SingleInstance.Mutex.v1";
-    private const string PipeName = "Scratchpad.SingleInstance.Pipe.v1";
+    private const string MutexName = "Scratchpad.SingleInstance.Mutex.v2";
+    private const string PipeName = "Scratchpad.SingleInstance.Pipe.v2";
     private static System.Threading.Mutex? _mutex;
+    private static bool _ownsMutex;
 
     private void App_Startup(object sender, StartupEventArgs e)
     {
         bool startMinimized = e.Args.Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase));
 
-        // Single instance check: if already running, ping it and exit
-        _mutex = new System.Threading.Mutex(true, MutexName, out var isFirstInstance);
-        if (!isFirstInstance)
+        _mutex = new System.Threading.Mutex(true, MutexName, out _ownsMutex);
+        if (!_ownsMutex)
         {
             try
             {
@@ -33,13 +33,9 @@ public partial class App : Application
             return;
         }
 
-        // Start listening for activation signals from other launches
         Task.Run(ListenForSecondInstance);
 
-        MainWin = new MainWindow();
-        MainWin.StartMinimized = startMinimized;
-        // Show the window off-screen so the HWND exists (needed for hotkey registration
-        // and taskbar entry). MainWindow will move it on-screen once WebView2 is ready.
+        MainWin = new MainWindow { StartMinimized = startMinimized };
         MainWin.Show();
     }
 
@@ -53,10 +49,7 @@ public partial class App : Application
                 await server.WaitForConnectionAsync();
                 using var reader = new StreamReader(server);
                 var msg = await reader.ReadLineAsync();
-                if (msg == "show")
-                {
-                    Dispatcher.Invoke(() => MainWin?.BringToFront());
-                }
+                if (msg == "show") Dispatcher.Invoke(() => MainWin?.BringToFront());
             }
             catch { }
         }
@@ -64,7 +57,10 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _mutex?.ReleaseMutex();
+        if (_ownsMutex)
+        {
+            try { _mutex?.ReleaseMutex(); } catch { }
+        }
         _mutex?.Dispose();
         base.OnExit(e);
     }
