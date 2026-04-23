@@ -201,6 +201,7 @@ public partial class MainWindow : Window
         else if (e.Key == Key.Escape)
         {
             e.Handled = true;
+            Grid1.CancelFormulaBarEdit();
             FormulaBar.Text = Grid1.GetCurrentFormulaText();
             Grid1.FocusSelectedCell();
         }

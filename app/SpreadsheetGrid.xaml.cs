@@ -27,6 +27,8 @@ public partial class SpreadsheetGrid : UserControl
     private bool _arrowRefActive;
     private int _refCursorCol, _refCursorRow, _refAnchorCol, _refAnchorRow;
     private string? _lastFormulaClickId;
+    private bool _programmaticTextChange;
+    private bool _freshTypeMode;
 
     // Undo/redo
     private readonly Stack<string> _undoStack = new();
@@ -39,10 +41,30 @@ public partial class SpreadsheetGrid : UserControl
     public SpreadsheetGrid()
     {
         InitializeComponent();
-        Data.Changed += Rebuild;
+        Data.Changed += OnDataChanged;
         Loaded += (_, _) => { Rebuild(); FocusSelectedCell(); };
         KeyDown += OnKeyDown;
         PreviewKeyDown += OnPreviewKeyDown;
+    }
+
+    private void OnDataChanged(GridChange change)
+    {
+        if (change.IsFull || change.DirtyCells.Count == 0)
+        {
+            Rebuild();
+            return;
+        }
+        // Incremental path: only the rows containing dirty cells need overlay refresh.
+        // Cell borders never change appearance based on content; they stay put.
+        var affectedRows = new HashSet<int>();
+        foreach (var id in change.DirtyCells)
+        {
+            var p = GridData.ParseRef(id);
+            if (p != null) affectedRows.Add(p.Value.row);
+        }
+        foreach (var row in affectedRows) RebuildRowTextOverlays(row);
+        ApplySelectionVisuals();
+        SelectionChanged?.Invoke();
     }
 
     public double GetColumnWidth(int col) => _colWidths.TryGetValue(col, out var w) ? w : DefaultColWidth;
@@ -149,7 +171,8 @@ public partial class SpreadsheetGrid : UserControl
             RootGrid.Children.Add(rh);
         }
 
-        // Cells
+        // Cells — bare Border only; text is rendered as an overlay below so it can
+        // overflow into empty adjacent columns to the right (Excel-style).
         for (int r = 0; r < Data.Rows; r++)
         {
             for (int c = 0; c < Data.Cols; c++)
@@ -162,18 +185,6 @@ public partial class SpreadsheetGrid : UserControl
                     Background = (Brush)FindResource("BgBrush"),
                     Tag = id
                 };
-                var text = new TextBlock
-                {
-                    Padding = new Thickness(6, 4, 6, 4),
-                    Foreground = (Brush)FindResource("TextBrush"),
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                var v = Data.GetValue(id);
-                text.Text = FormatValue(v);
-                if (v is double) text.HorizontalAlignment = HorizontalAlignment.Right;
-                cellBorder.Child = text;
                 cellBorder.MouseLeftButtonDown += Cell_MouseLeftButtonDown;
                 cellBorder.MouseMove += Cell_MouseMove;
                 cellBorder.MouseLeftButtonUp += Cell_MouseLeftButtonUp;
@@ -182,8 +193,324 @@ public partial class SpreadsheetGrid : UserControl
             }
         }
 
+        // Text overlays — float above the cells so content can extend into empty
+        // right neighbors. IsHitTestVisible=false keeps mouse events on the cells.
+        for (int r = 0; r < Data.Rows; r++) AddRowTextOverlays(r);
+
+        AddFillHandle();
+
         ApplySelectionVisuals();
         SelectionChanged?.Invoke();
+    }
+
+    // ---- Fill handle (Excel-style drag-to-fill) ----
+
+    private Border? _fillHandle;
+    private Border? _fillPreview;
+    private bool _filling;
+    private bool _cellHovered;
+    private bool _handleHovered;
+    private Border? _hoverWatchedCell;
+    private (int col, int row) _fillSourceTopLeft;
+    private (int col, int row) _fillSourceBottomRight;
+    private (int col, int row) _fillTarget;
+
+    private void AddFillHandle()
+    {
+        _fillHandle = new Border
+        {
+            Width = 8,
+            Height = 8,
+            Background = (Brush)FindResource("AccentBrush"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -4, -4),
+            Cursor = Cursors.Cross,
+            Visibility = Visibility.Collapsed
+        };
+        Panel.SetZIndex(_fillHandle, 10);
+        _fillHandle.MouseLeftButtonDown += FillHandle_MouseLeftButtonDown;
+        _fillHandle.MouseEnter += (_, _) => { _handleHovered = true; UpdateFillHandleVisibility(); };
+        _fillHandle.MouseLeave += (_, _) => { _handleHovered = false; UpdateFillHandleVisibility(); };
+        RootGrid.Children.Add(_fillHandle);
+    }
+
+    /// <summary>
+    /// Watches the bottom-right cell of the current selection for hover so the
+    /// fill handle only appears when the user might want it. Re-attaches on each
+    /// selection change.
+    /// </summary>
+    private void UpdateHoverWatcher()
+    {
+        if (_hoverWatchedCell != null)
+        {
+            _hoverWatchedCell.MouseEnter -= Cell_HoverEnter;
+            _hoverWatchedCell.MouseLeave -= Cell_HoverLeave;
+            _hoverWatchedCell = null;
+        }
+        var (c, r) = GetSelectionBottomRight();
+        var cell = FindCell(GridData.CellId(c, r));
+        if (cell != null)
+        {
+            cell.MouseEnter += Cell_HoverEnter;
+            cell.MouseLeave += Cell_HoverLeave;
+            _hoverWatchedCell = cell;
+            _cellHovered = cell.IsMouseOver;
+        }
+    }
+
+    private void Cell_HoverEnter(object sender, MouseEventArgs e)
+    {
+        _cellHovered = true;
+        UpdateFillHandleVisibility();
+    }
+
+    private void Cell_HoverLeave(object sender, MouseEventArgs e)
+    {
+        _cellHovered = false;
+        UpdateFillHandleVisibility();
+    }
+
+    private void UpdateFillHandleVisibility()
+    {
+        if (_fillHandle == null) return;
+        bool shouldShow = _editingInput == null && (_filling || _cellHovered || _handleHovered);
+        _fillHandle.Visibility = shouldShow ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private (int col, int row) GetSelectionBottomRight()
+    {
+        if (_selectionRange is { } rng) return (rng.maxC, rng.maxR);
+        var p = GridData.ParseRef(SelectedCell);
+        return p ?? (0, 0);
+    }
+
+    private (int col, int row) GetSelectionTopLeft()
+    {
+        if (_selectionRange is { } rng) return (rng.minC, rng.minR);
+        var p = GridData.ParseRef(SelectedCell);
+        return p ?? (0, 0);
+    }
+
+    private void PositionFillHandle()
+    {
+        if (_fillHandle == null) return;
+        var (c, r) = GetSelectionBottomRight();
+        Grid.SetColumn(_fillHandle, c + 1);
+        Grid.SetRow(_fillHandle, r + 1);
+        UpdateHoverWatcher();
+        UpdateFillHandleVisibility();
+    }
+
+    private void FillHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_fillHandle == null) return;
+        _fillSourceTopLeft = GetSelectionTopLeft();
+        _fillSourceBottomRight = GetSelectionBottomRight();
+        _fillTarget = _fillSourceBottomRight;
+        _filling = true;
+        _fillHandle.CaptureMouse();
+        _fillHandle.MouseMove += FillHandle_MouseMove;
+        _fillHandle.MouseLeftButtonUp += FillHandle_MouseLeftButtonUp;
+        EnsureFillPreview();
+        UpdateFillPreview();
+        e.Handled = true;
+    }
+
+    private void EnsureFillPreview()
+    {
+        if (_fillPreview != null) return;
+        _fillPreview = new Border
+        {
+            BorderBrush = (Brush)FindResource("AccentBrush"),
+            BorderThickness = new Thickness(1),
+            Background = Brushes.Transparent,
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed
+        };
+        Panel.SetZIndex(_fillPreview, 9);
+        RootGrid.Children.Add(_fillPreview);
+    }
+
+    private void FillHandle_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_filling) return;
+        var pt = e.GetPosition(RootGrid);
+        var cell = HitTestCell(pt);
+        if (cell == null) return;
+
+        // Constrain to a single axis (whichever has a larger delta from the source
+        // bottom-right). Excel fills along one direction at a time from the handle.
+        var (tc, tr) = cell.Value;
+        int dc = tc - _fillSourceBottomRight.col;
+        int dr = tr - _fillSourceBottomRight.row;
+        if (Math.Abs(dc) > Math.Abs(dr))
+            _fillTarget = (tc, _fillSourceBottomRight.row);
+        else
+            _fillTarget = (_fillSourceBottomRight.col, tr);
+
+        UpdateFillPreview();
+    }
+
+    private (int col, int row)? HitTestCell(Point p)
+    {
+        double x = RowHeaderWidth;
+        int col = -1;
+        for (int c = 0; c < Data.Cols; c++)
+        {
+            var w = GetColumnWidth(c);
+            if (p.X >= x && p.X < x + w) { col = c; break; }
+            x += w;
+        }
+        if (col < 0) col = p.X < RowHeaderWidth ? 0 : Data.Cols - 1;
+
+        int row = (int)Math.Floor((p.Y - HeaderHeight) / RowHeight);
+        row = Math.Clamp(row, 0, Data.Rows - 1);
+        return (col, row);
+    }
+
+    private void UpdateFillPreview()
+    {
+        if (_fillPreview == null) return;
+        // Span from the source's top-left to the target corner.
+        int minC = Math.Min(_fillSourceTopLeft.col, _fillTarget.col);
+        int maxC = Math.Max(_fillSourceBottomRight.col, _fillTarget.col);
+        int minR = Math.Min(_fillSourceTopLeft.row, _fillTarget.row);
+        int maxR = Math.Max(_fillSourceBottomRight.row, _fillTarget.row);
+        Grid.SetColumn(_fillPreview, minC + 1);
+        Grid.SetRow(_fillPreview, minR + 1);
+        Grid.SetColumnSpan(_fillPreview, maxC - minC + 1);
+        Grid.SetRowSpan(_fillPreview, maxR - minR + 1);
+        _fillPreview.Visibility = Visibility.Visible;
+    }
+
+    private void FillHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_filling) { if (_fillHandle != null) _fillHandle.ReleaseMouseCapture(); return; }
+        if (_fillHandle != null)
+        {
+            _fillHandle.ReleaseMouseCapture();
+            _fillHandle.MouseMove -= FillHandle_MouseMove;
+            _fillHandle.MouseLeftButtonUp -= FillHandle_MouseLeftButtonUp;
+        }
+        _filling = false;
+        if (_fillPreview != null) _fillPreview.Visibility = Visibility.Collapsed;
+
+        ApplyFill();
+    }
+
+    private void ApplyFill()
+    {
+        var (sTLc, sTLr) = _fillSourceTopLeft;
+        var (sBRc, sBRr) = _fillSourceBottomRight;
+        var (tc, tr) = _fillTarget;
+
+        // Determine direction. If target == source's bottom-right, nothing to do.
+        if (tc == sBRc && tr == sBRr) return;
+
+        PushUndo();
+
+        // The source block is (sTLc..sBRc, sTLr..sBRr). Fill into the area
+        // extending from source's top-left to the target corner, skipping the
+        // source block itself.
+        int minC = Math.Min(sTLc, tc);
+        int maxC = Math.Max(sBRc, tc);
+        int minR = Math.Min(sTLr, tr);
+        int maxR = Math.Max(sBRr, tr);
+
+        int srcW = sBRc - sTLc + 1;
+        int srcH = sBRr - sTLr + 1;
+
+        for (int r = minR; r <= maxR; r++)
+        {
+            for (int c = minC; c <= maxC; c++)
+            {
+                // Skip source cells
+                if (c >= sTLc && c <= sBRc && r >= sTLr && r <= sBRr) continue;
+
+                // Find which source cell this maps to (tile the source block)
+                int offsetFromSrcC = ((c - sTLc) % srcW + srcW) % srcW;
+                int offsetFromSrcR = ((r - sTLr) % srcH + srcH) % srcH;
+                var srcC = sTLc + offsetFromSrcC;
+                var srcR = sTLr + offsetFromSrcR;
+                var srcRaw = Data.GetRaw(GridData.CellId(srcC, srcR));
+                if (string.IsNullOrEmpty(srcRaw)) { Data.SetCell(GridData.CellId(c, r), ""); continue; }
+
+                int dc = c - srcC;
+                int dr = r - srcR;
+                var adjusted = FormulaEvaluator.AdjustReferences(srcRaw, dc, dr, Data.Cols, Data.Rows);
+                Data.SetCell(GridData.CellId(c, r), adjusted);
+            }
+        }
+
+        // Extend the selection to include the filled area.
+        var anchor = GridData.CellId(sTLc, sTLr);
+        var end = GridData.CellId(maxC, maxR);
+        SetSelectionRange(anchor, end);
+    }
+
+    /// <summary>Marker tag on overlay TextBlocks so we can find and rip them out per row.</summary>
+    private const string OverlayTagPrefix = "overlay:";
+
+    private void RebuildRowTextOverlays(int row)
+    {
+        // Remove existing overlays for this row. Iterate over a snapshot since we'll
+        // be mutating the Children collection.
+        var toRemove = new List<UIElement>();
+        foreach (UIElement child in RootGrid.Children)
+        {
+            if (child is TextBlock tb && tb.Tag is string tag && tag.StartsWith(OverlayTagPrefix))
+            {
+                var id = tag.Substring(OverlayTagPrefix.Length);
+                var p = GridData.ParseRef(id);
+                if (p != null && p.Value.row == row) toRemove.Add(tb);
+            }
+        }
+        foreach (var e in toRemove) RootGrid.Children.Remove(e);
+
+        AddRowTextOverlays(row);
+    }
+
+    private void AddRowTextOverlays(int row)
+    {
+        for (int c = 0; c < Data.Cols; c++)
+        {
+            var id = GridData.CellId(c, row);
+            var v = Data.GetValue(id);
+            var str = FormatValue(v);
+            if (string.IsNullOrEmpty(str)) continue;
+
+            bool isNumber = v is double;
+
+            int span = 1;
+            if (!isNumber)
+            {
+                while (c + span < Data.Cols)
+                {
+                    var rightRaw = Data.GetRaw(GridData.CellId(c + span, row));
+                    if (!string.IsNullOrEmpty(rightRaw)) break;
+                    span++;
+                }
+            }
+
+            var text = new TextBlock
+            {
+                Text = str,
+                Padding = new Thickness(6, 4, 6, 4),
+                Foreground = (Brush)FindResource("TextBrush"),
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                IsHitTestVisible = false,
+                Tag = OverlayTagPrefix + id
+            };
+            if (isNumber) text.HorizontalAlignment = HorizontalAlignment.Right;
+            Grid.SetColumn(text, c + 1);
+            Grid.SetRow(text, row + 1);
+            Grid.SetColumnSpan(text, span);
+            Panel.SetZIndex(text, 1);
+            RootGrid.Children.Add(text);
+        }
     }
 
     private static string FormatValue(object? v) => v switch
@@ -209,12 +536,15 @@ public partial class SpreadsheetGrid : UserControl
 
     private void ApplySelectionVisuals()
     {
+        var defaultBorder = (Brush)FindResource("BorderBrush1");
+        var defaultBg = (Brush)FindResource("BgBrush");
         foreach (var child in RootGrid.Children)
         {
-            if (child is Border b && b.Tag is string id)
+            if (child is Border b && b.Tag is string)
             {
+                b.BorderBrush = defaultBorder;
                 b.BorderThickness = new Thickness(0, 0, 1, 1);
-                b.Background = (Brush)FindResource("BgBrush");
+                b.Background = defaultBg;
             }
         }
 
@@ -235,6 +565,8 @@ public partial class SpreadsheetGrid : UserControl
             sel.BorderBrush = (Brush)FindResource("AccentBrush");
             sel.BorderThickness = new Thickness(2);
         }
+
+        PositionFillHandle();
     }
 
     private Border? FindCell(string id)
@@ -366,6 +698,15 @@ public partial class SpreadsheetGrid : UserControl
     private void Grip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Border b || b.Tag is not int c) return;
+
+        // Double-click: auto-fit column to the widest content
+        if (e.ClickCount == 2)
+        {
+            AutoSizeColumn(c);
+            e.Handled = true;
+            return;
+        }
+
         _resizeCol = c;
         _resizeStartX = e.GetPosition(this).X;
         _resizeStartW = GetColumnWidth(c);
@@ -373,6 +714,38 @@ public partial class SpreadsheetGrid : UserControl
         b.MouseMove += Grip_MouseMove;
         b.MouseLeftButtonUp += Grip_MouseLeftButtonUp;
         e.Handled = true;
+    }
+
+    private void AutoSizeColumn(int col)
+    {
+        const double horizontalPadding = 16; // ~6px each side + breathing room
+        const double minAutoWidth = 40;
+        var typeface = new Typeface(
+            new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+
+        double maxWidth = minAutoWidth;
+
+        // Header width (the column letter)
+        var headerStr = ((char)('A' + col)).ToString();
+        var headerFt = new FormattedText(headerStr, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            typeface, 13.0, Brushes.Black, dpi);
+        maxWidth = Math.Max(maxWidth, headerFt.Width + horizontalPadding);
+
+        // Each cell's rendered content width
+        for (int r = 0; r < Data.Rows; r++)
+        {
+            var id = GridData.CellId(col, r);
+            var v = Data.GetValue(id);
+            var str = FormatValue(v);
+            if (string.IsNullOrEmpty(str)) continue;
+            var ft = new FormattedText(str, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                typeface, 13.0, Brushes.Black, dpi);
+            maxWidth = Math.Max(maxWidth, ft.Width + horizontalPadding);
+        }
+
+        _colWidths[col] = Math.Ceiling(maxWidth);
+        Rebuild();
     }
 
     private void Grip_MouseMove(object sender, MouseEventArgs e)
@@ -397,7 +770,7 @@ public partial class SpreadsheetGrid : UserControl
 
     // ---- Editing ----
 
-    public void StartEdit(string id, string? initialValue = null)
+    public void StartEdit(string id, bool replaceContent = false, bool focusEditor = true)
     {
         if (_editingInput != null) CommitEdit(true);
         var cell = FindCell(id);
@@ -406,10 +779,15 @@ public partial class SpreadsheetGrid : UserControl
         _formulaInsertPos = 0;
         _formulaInsertLen = 0;
         _arrowRefActive = false;
+        _freshTypeMode = replaceContent;
+
+        // If replaceContent (user pressed a printable key), start with empty text —
+        // the in-flight TextInput event will deliver the typed char into the TextBox.
+        var initialText = replaceContent ? "" : Data.GetRaw(id);
 
         var tb = new TextBox
         {
-            Text = initialValue ?? Data.GetRaw(id),
+            Text = initialText,
             Background = (Brush)FindResource("BgBrush"),
             Foreground = (Brush)FindResource("TextBrush"),
             BorderBrush = (Brush)FindResource("AccentBrush"),
@@ -419,16 +797,50 @@ public partial class SpreadsheetGrid : UserControl
             Padding = new Thickness(4, 2, 4, 2),
             CaretBrush = (Brush)FindResource("TextBrush")
         };
-        tb.SelectionStart = tb.Text.Length;
         tb.PreviewKeyDown += EditInput_PreviewKeyDown;
-        tb.TextChanged += (_, _) => { _formulaInsertPos = tb.SelectionStart; _formulaInsertLen = 0; FormulaBarTextChanged?.Invoke(tb.Text); };
+        tb.TextChanged += (_, _) =>
+        {
+            // Programmatic updates (e.g. InsertRefIntoFormula) manage _formulaInsertPos/Len
+            // themselves — skip the user-typed update path.
+            if (!_programmaticTextChange)
+            {
+                _formulaInsertPos = tb.SelectionStart;
+                _formulaInsertLen = 0;
+            }
+            FormulaBarTextChanged?.Invoke(tb.Text);
+        };
         tb.LostFocus += (_, _) => { if (!_formulaSelecting && _editingInput == tb) CommitEdit(true); };
 
         cell.Child = tb;
         _editingInput = tb;
-        tb.Focus();
-        tb.SelectAll();
+
+        // Hide the cell's text overlay — it's rendered on top of the cell Border
+        // and would otherwise show the old value behind the TextBox.
+        RemoveOverlayForCell(id);
+        UpdateFillHandleVisibility();
+
+        if (focusEditor)
+        {
+            tb.Focus();
+            // F2/double-click/formula bar edit: select existing content so typing replaces it.
+            // Fresh-type start: empty Text, caret at 0, TextInput will populate.
+            if (!replaceContent) tb.SelectAll();
+        }
         FormulaBarTextChanged?.Invoke(tb.Text);
+    }
+
+    private void RemoveOverlayForCell(string id)
+    {
+        UIElement? toRemove = null;
+        foreach (UIElement child in RootGrid.Children)
+        {
+            if (child is TextBlock tb && tb.Tag is string tag && tag == OverlayTagPrefix + id)
+            {
+                toRemove = tb;
+                break;
+            }
+        }
+        if (toRemove != null) RootGrid.Children.Remove(toRemove);
     }
 
     public event Action<string>? FormulaBarTextChanged;
@@ -451,6 +863,7 @@ public partial class SpreadsheetGrid : UserControl
         _editingInput = null;
         _editingCellId = null;
         _arrowRefActive = false;
+        _freshTypeMode = false;
         ClearFormulaRefs();
         Rebuild();
         ApplySelectionVisuals();
@@ -475,26 +888,49 @@ public partial class SpreadsheetGrid : UserControl
     public void UpdateEditFromFormulaBar(string text)
     {
         if (_editingInput == null) return;
+        _programmaticTextChange = true;
         _editingInput.Text = text;
+        _programmaticTextChange = false;
         _editingInput.CaretIndex = text.Length;
+    }
+
+    public void CancelFormulaBarEdit()
+    {
+        if (_editingInput != null) CommitEdit(false);
     }
 
     public void BeginEditFromFormulaBar(string text)
     {
-        StartEdit(SelectedCell);
+        // Keep focus on the formula bar; user clicked there to edit the formula directly.
+        StartEdit(SelectedCell, focusEditor: false);
         if (_editingInput != null)
         {
+            _programmaticTextChange = true;
             _editingInput.Text = text;
+            _programmaticTextChange = false;
             _editingInput.CaretIndex = text.Length;
         }
     }
 
     public void CommitFormulaBarEdit(string text)
     {
-        PushUndo();
-        var raw = text.TrimStart().StartsWith("=") ? AutoCloseParens(text) : text;
-        Data.SetCell(SelectedCell, raw);
-        Rebuild();
+        if (_editingInput != null)
+        {
+            // We're in edit mode (started by the formula bar). Sync text, then use
+            // the standard CommitEdit path so all editing state cleans up properly.
+            _programmaticTextChange = true;
+            _editingInput.Text = text;
+            _programmaticTextChange = false;
+            CommitEdit(true);
+        }
+        else
+        {
+            // Defensive fallback — not currently in edit mode. Save directly.
+            PushUndo();
+            var raw = text.TrimStart().StartsWith("=") ? AutoCloseParens(text) : text;
+            Data.SetCell(SelectedCell, raw);
+            Rebuild();
+        }
         MoveSelection(0, 1);
         Focus();
     }
@@ -507,7 +943,9 @@ public partial class SpreadsheetGrid : UserControl
         var val = _editingInput.Text;
         var before = val[.._formulaInsertPos];
         var after = val[(_formulaInsertPos + _formulaInsertLen)..];
+        _programmaticTextChange = true;
         _editingInput.Text = before + refStr + after;
+        _programmaticTextChange = false;
         _formulaInsertLen = refStr.Length;
         _editingInput.CaretIndex = _formulaInsertPos + refStr.Length;
         FormulaBarTextChanged?.Invoke(_editingInput.Text);
@@ -581,6 +1019,24 @@ public partial class SpreadsheetGrid : UserControl
             _editingInput = null;
             _editingCellId = null;
             Rebuild();
+            Focus();
+        }
+        else if (_freshTypeMode && !IsFormulaMode() &&
+                 (e.Key == Key.Up || e.Key == Key.Down || e.Key == Key.Left || e.Key == Key.Right))
+        {
+            // Excel-style "Enter mode": arrow keys during a fresh type commit and move.
+            // If the user wants to edit within the text, they can click or press F2.
+            e.Handled = true;
+            CommitEdit(true);
+            int dc = 0, dr = 0;
+            switch (e.Key)
+            {
+                case Key.Up: dr = -1; break;
+                case Key.Down: dr = 1; break;
+                case Key.Left: dc = -1; break;
+                case Key.Right: dc = 1; break;
+            }
+            MoveSelection(dc, dr);
             Focus();
         }
         else if (IsFormulaMode() &&
@@ -681,61 +1137,32 @@ public partial class SpreadsheetGrid : UserControl
         if (_editingInput != null || e.Handled) return;
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) return;
 
-        // If a printable character, start edit with that initial value
-        var text = TextFromKeyEvent(e);
-        if (!string.IsNullOrEmpty(text))
+        // Printable key on a non-editing cell: open the editor WITHOUT pre-populating
+        // (so the in-flight TextInput event naturally delivers the character into
+        // the now-focused TextBox). Don't mark e.Handled — we want TextInput to flow.
+        if (IsPrintableKey(e.Key))
         {
-            e.Handled = true;
-            StartEdit(SelectedCell, text);
+            // Clear existing content so the typed char becomes the new value
+            StartEdit(SelectedCell, replaceContent: true);
         }
     }
 
-    private static string TextFromKeyEvent(KeyEventArgs e)
+    private static bool IsPrintableKey(Key k)
     {
-        var key = e.Key;
-        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        // Letters
-        if (key >= Key.A && key <= Key.Z) return ((char)('A' + (key - Key.A) + (shift ? 0 : 32))).ToString();
-        // Top-row digits (no shift)
-        if (!shift && key >= Key.D0 && key <= Key.D9) return ((char)('0' + (key - Key.D0))).ToString();
-        if (key >= Key.NumPad0 && key <= Key.NumPad9) return ((char)('0' + (key - Key.NumPad0))).ToString();
-        // Common punctuation / symbols
-        if (!shift)
+        if (k >= Key.A && k <= Key.Z) return true;
+        if (k >= Key.D0 && k <= Key.D9) return true;
+        if (k >= Key.NumPad0 && k <= Key.NumPad9) return true;
+        switch (k)
         {
-            return key switch
-            {
-                Key.OemMinus => "-",
-                Key.OemPlus => "=",
-                Key.OemPeriod => ".",
-                Key.Decimal => ".",
-                Key.OemComma => ",",
-                Key.OemQuestion => "/",
-                Key.Divide => "/",
-                Key.Multiply => "*",
-                Key.Add => "+",
-                Key.Subtract => "-",
-                Key.Space => " ",
-                _ => ""
-            };
+            case Key.OemMinus: case Key.OemPlus: case Key.OemComma: case Key.OemPeriod:
+            case Key.OemQuestion: case Key.OemSemicolon: case Key.OemQuotes:
+            case Key.OemOpenBrackets: case Key.OemCloseBrackets: case Key.OemPipe:
+            case Key.OemTilde: case Key.OemBackslash: case Key.Space:
+            case Key.Decimal: case Key.Multiply: case Key.Add: case Key.Subtract:
+            case Key.Divide:
+                return true;
         }
-        else
-        {
-            return key switch
-            {
-                Key.OemPlus => "+",
-                Key.D8 => "*",
-                Key.D9 => "(",
-                Key.D0 => ")",
-                Key.OemQuestion => "?",
-                Key.D2 => "@",
-                Key.D5 => "%",
-                Key.OemComma => "<",
-                Key.OemPeriod => ">",
-                Key.D6 => "^",
-                Key.OemMinus => "_",
-                _ => ""
-            };
-        }
+        return false;
     }
 
     public void MoveSelection(int dc, int dr)

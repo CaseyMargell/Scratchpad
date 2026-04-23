@@ -11,6 +11,79 @@ namespace Scratchpad;
 /// </summary>
 public static class FormulaEvaluator
 {
+    /// <summary>
+    /// Extracts every cell id referenced by a formula, expanding range refs
+    /// (A1:B3) into the full set of individual cells. Non-formula values
+    /// (starts without "=") return an empty set. Used to maintain the
+    /// reverse-dependency graph for incremental recalculation.
+    /// </summary>
+    public static HashSet<string> ExtractReferences(string raw)
+    {
+        var refs = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(raw)) return refs;
+        var trimmed = raw.TrimStart();
+        if (!trimmed.StartsWith("=")) return refs;
+
+        // Collect ranges first so their component cells are added; then mask
+        // them out so we don't also add the literal range tokens as single refs.
+        var masked = Regex.Replace(trimmed, @"([A-Z])(\d+):([A-Z])(\d+)", m =>
+        {
+            int c1 = m.Groups[1].Value[0] - 'A', r1 = int.Parse(m.Groups[2].Value) - 1;
+            int c2 = m.Groups[3].Value[0] - 'A', r2 = int.Parse(m.Groups[4].Value) - 1;
+            for (int c = Math.Min(c1, c2); c <= Math.Max(c1, c2); c++)
+                for (int r = Math.Min(r1, r2); r <= Math.Max(r1, r2); r++)
+                    refs.Add(GridData.CellId(c, r));
+            return new string(' ', m.Length);
+        });
+
+        foreach (Match m in Regex.Matches(masked, @"([A-Z])(\d+)"))
+            refs.Add(m.Value.ToUpperInvariant());
+
+        return refs;
+    }
+
+    /// <summary>
+    /// Shifts every cell reference in a formula by (dc, dr). Used by the Excel-style
+    /// fill handle to produce adjusted formulas for target cells. References that
+    /// would shift off-grid get clamped to the edge (Excel extends, but clamping is
+    /// safer for our fixed-size grids). Non-formula values pass through unchanged.
+    /// </summary>
+    public static string AdjustReferences(string raw, int dc, int dr, int cols, int rows)
+    {
+        if (string.IsNullOrEmpty(raw)) return raw;
+        var trimmed = raw.TrimStart();
+        if (!trimmed.StartsWith("=")) return raw;
+
+        // Ranges first — replaced with placeholders so the single-ref pass doesn't
+        // re-shift their already-adjusted components.
+        var ranges = new List<string>();
+        string result = Regex.Replace(raw, @"([A-Z])(\d+):([A-Z])(\d+)", m =>
+        {
+            var c1 = Math.Clamp(m.Groups[1].Value[0] - 'A' + dc, 0, cols - 1);
+            var r1 = Math.Clamp(int.Parse(m.Groups[2].Value) - 1 + dr, 0, rows - 1);
+            var c2 = Math.Clamp(m.Groups[3].Value[0] - 'A' + dc, 0, cols - 1);
+            var r2 = Math.Clamp(int.Parse(m.Groups[4].Value) - 1 + dr, 0, rows - 1);
+            var adjusted = $"{(char)('A' + c1)}{r1 + 1}:{(char)('A' + c2)}{r2 + 1}";
+            var idx = ranges.Count;
+            ranges.Add(adjusted);
+            return $"\u0001{idx}\u0001";
+        });
+
+        // Single cell refs.
+        result = Regex.Replace(result, @"([A-Z])(\d+)", m =>
+        {
+            var c = Math.Clamp(m.Groups[1].Value[0] - 'A' + dc, 0, cols - 1);
+            var r = Math.Clamp(int.Parse(m.Groups[2].Value) - 1 + dr, 0, rows - 1);
+            return $"{(char)('A' + c)}{r + 1}";
+        });
+
+        // Restore the preserved ranges.
+        result = Regex.Replace(result, @"\u0001(\d+)\u0001", m =>
+            ranges[int.Parse(m.Groups[1].Value)]);
+
+        return result;
+    }
+
     public static object Evaluate(string raw, GridData grid, HashSet<string> visited)
     {
         if (string.IsNullOrEmpty(raw)) return "";
