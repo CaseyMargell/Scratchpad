@@ -32,6 +32,13 @@ public partial class SpreadsheetGrid : UserControl
 
     // Undo/redo
     private readonly Stack<string> _undoStack = new();
+
+    // Internal clipboard snapshot so paste-within-our-app can reconstruct formulas
+    // with reference adjustment. The system clipboard still holds evaluated text for
+    // external paste compatibility (Excel, Notepad, etc).
+    private string? _internalClipboardText;
+    private (int col, int row)? _internalClipboardOrigin;
+    private Dictionary<(int dc, int dr), string>? _internalClipboardRaws;
     private readonly Stack<string> _redoStack = new();
     private const int MaxUndo = 50;
 
@@ -1212,8 +1219,12 @@ public partial class SpreadsheetGrid : UserControl
     {
         var sb = new StringBuilder();
         var cellsToClear = new List<string>();
+        var raws = new Dictionary<(int dc, int dr), string>();
+        (int col, int row) origin;
+
         if (_selectionRange is { } rng)
         {
+            origin = (rng.minC, rng.minR);
             for (int r = rng.minR; r <= rng.maxR; r++)
             {
                 var row = new List<string>();
@@ -1222,7 +1233,9 @@ public partial class SpreadsheetGrid : UserControl
                     var id = GridData.CellId(c, r);
                     var v = Data.GetValue(id);
                     row.Add(FormatValueForClipboard(v));
-                    if (isCut && !string.IsNullOrEmpty(Data.GetRaw(id))) cellsToClear.Add(id);
+                    var raw = Data.GetRaw(id);
+                    raws[(c - rng.minC, r - rng.minR)] = raw;
+                    if (isCut && !string.IsNullOrEmpty(raw)) cellsToClear.Add(id);
                 }
                 sb.Append(string.Join("\t", row));
                 sb.Append('\n');
@@ -1230,11 +1243,24 @@ public partial class SpreadsheetGrid : UserControl
         }
         else
         {
+            var p = GridData.ParseRef(SelectedCell);
+            if (p == null) return;
+            origin = p.Value;
             var v = Data.GetValue(SelectedCell);
             sb.Append(FormatValueForClipboard(v));
-            if (isCut && !string.IsNullOrEmpty(Data.GetRaw(SelectedCell))) cellsToClear.Add(SelectedCell);
+            var raw = Data.GetRaw(SelectedCell);
+            raws[(0, 0)] = raw;
+            if (isCut && !string.IsNullOrEmpty(raw)) cellsToClear.Add(SelectedCell);
         }
-        try { Clipboard.SetText(sb.ToString()); } catch { }
+
+        var text = sb.ToString();
+        try { Clipboard.SetText(text); } catch { }
+
+        // Remember this copy so Paste-within-our-app can replay raws with ref adjustment.
+        _internalClipboardText = text;
+        _internalClipboardOrigin = origin;
+        _internalClipboardRaws = raws;
+
         if (isCut && cellsToClear.Count > 0)
         {
             PushUndo();
@@ -1263,14 +1289,43 @@ public partial class SpreadsheetGrid : UserControl
         if (pos == null) return;
 
         PushUndo();
-        var lines = text.TrimEnd('\r', '\n').Split('\n');
-        for (int r = 0; r < lines.Length && pos.Value.row + r < Data.Rows; r++)
+
+        // If this clipboard is our own copy, replay the raw formulas with ref adjustment.
+        // Otherwise fall back to the plain-text tab-delimited path so pasting from Excel
+        // (or any external app) still works.
+        bool isOwnCopy = _internalClipboardText != null
+                      && _internalClipboardText == text
+                      && _internalClipboardOrigin.HasValue
+                      && _internalClipboardRaws != null;
+
+        if (isOwnCopy)
         {
-            var line = lines[r].TrimEnd('\r');
-            var cols = line.Split('\t');
-            for (int c = 0; c < cols.Length && pos.Value.col + c < Data.Cols; c++)
+            var origin = _internalClipboardOrigin!.Value;
+            int dc = pos.Value.col - origin.col;
+            int dr = pos.Value.row - origin.row;
+            foreach (var kv in _internalClipboardRaws!)
             {
-                Data.SetCell(GridData.CellId(pos.Value.col + c, pos.Value.row + r), cols[c]);
+                var targetC = pos.Value.col + kv.Key.dc;
+                var targetR = pos.Value.row + kv.Key.dr;
+                if (targetC < 0 || targetC >= Data.Cols || targetR < 0 || targetR >= Data.Rows) continue;
+                var raw = kv.Value;
+                var adjusted = raw.TrimStart().StartsWith("=")
+                    ? FormulaEvaluator.AdjustReferences(raw, dc, dr, Data.Cols, Data.Rows)
+                    : raw;
+                Data.SetCell(GridData.CellId(targetC, targetR), adjusted);
+            }
+        }
+        else
+        {
+            var lines = text.TrimEnd('\r', '\n').Split('\n');
+            for (int r = 0; r < lines.Length && pos.Value.row + r < Data.Rows; r++)
+            {
+                var line = lines[r].TrimEnd('\r');
+                var cols = line.Split('\t');
+                for (int c = 0; c < cols.Length && pos.Value.col + c < Data.Cols; c++)
+                {
+                    Data.SetCell(GridData.CellId(pos.Value.col + c, pos.Value.row + r), cols[c]);
+                }
             }
         }
         Rebuild();
