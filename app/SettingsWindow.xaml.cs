@@ -131,6 +131,12 @@ public partial class SettingsWindow : Window
         _main.Quit();
     }
 
+    private void ClearAllBtn_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+        _main.ClearAllWithConfirm();
+    }
+
     private static string FormatHotkey(HotkeyCombo c)
     {
         var parts = new List<string>();

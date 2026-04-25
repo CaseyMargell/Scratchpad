@@ -171,7 +171,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ClearBtn_Click(object sender, RoutedEventArgs e)
+    public void ClearAllWithConfirm()
     {
         if (MessageBox.Show(this, "Clear all cells?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         Grid1.ClearAll();
@@ -182,6 +182,30 @@ public partial class MainWindow : Window
         var win = new SettingsWindow(this) { Owner = this };
         win.ShowDialog();
     }
+
+    // ---- Format popover ----
+
+    private void FormatBtn_Click(object sender, RoutedEventArgs e)
+    {
+        SyncFormatPopup();
+        FormatPopup.IsOpen = !FormatPopup.IsOpen;
+    }
+
+    private void SyncFormatPopup()
+    {
+        var f = Grid1.GetSelectionFormat();
+        FmtCurrencyBtn.Tag = f?.Style == FormatStyle.Currency ? "active" : null;
+        FmtPercentBtn.Tag  = f?.Style == FormatStyle.Percent  ? "active" : null;
+        FmtNumberBtn.Tag   = f?.Style == FormatStyle.Number   ? "active" : null;
+        FmtDecValue.Text = f?.Decimals?.ToString() ?? "—";
+    }
+
+    private void FmtCurrencyBtn_Click(object sender, RoutedEventArgs e) { Grid1.ApplyFormatStyle(FormatStyle.Currency); SyncFormatPopup(); }
+    private void FmtPercentBtn_Click(object sender, RoutedEventArgs e)  { Grid1.ApplyFormatStyle(FormatStyle.Percent); SyncFormatPopup(); }
+    private void FmtNumberBtn_Click(object sender, RoutedEventArgs e)   { Grid1.ApplyFormatStyle(FormatStyle.Number); SyncFormatPopup(); }
+    private void FmtDecLessBtn_Click(object sender, RoutedEventArgs e)  { Grid1.AdjustDecimals(-1); SyncFormatPopup(); }
+    private void FmtDecMoreBtn_Click(object sender, RoutedEventArgs e)  { Grid1.AdjustDecimals(+1); SyncFormatPopup(); }
+    private void FmtClearBtn_Click(object sender, RoutedEventArgs e)    { Grid1.ClearFormat(); SyncFormatPopup(); }
 
     private void HelpBtn_Click(object sender, RoutedEventArgs e)
     {

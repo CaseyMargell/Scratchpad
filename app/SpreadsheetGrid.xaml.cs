@@ -195,6 +195,8 @@ public partial class SpreadsheetGrid : UserControl
                 cellBorder.MouseLeftButtonDown += Cell_MouseLeftButtonDown;
                 cellBorder.MouseMove += Cell_MouseMove;
                 cellBorder.MouseLeftButtonUp += Cell_MouseLeftButtonUp;
+                cellBorder.MouseRightButtonDown += Cell_MouseRightButtonDown;
+                cellBorder.ContextMenu = GetCellContextMenu();
                 Grid.SetColumn(cellBorder, c + 1); Grid.SetRow(cellBorder, r + 1);
                 RootGrid.Children.Add(cellBorder);
             }
@@ -484,7 +486,8 @@ public partial class SpreadsheetGrid : UserControl
         {
             var id = GridData.CellId(c, row);
             var v = Data.GetValue(id);
-            var str = FormatValue(v);
+            var fmt = Data.GetFormat(id);
+            var str = FormatValue(v, fmt);
             if (string.IsNullOrEmpty(str)) continue;
 
             bool isNumber = v is double;
@@ -520,15 +523,8 @@ public partial class SpreadsheetGrid : UserControl
         }
     }
 
-    private static string FormatValue(object? v) => v switch
-    {
-        null => "",
-        "" => "",
-        double d when double.IsNaN(d) => "#ERR",
-        double d when d == Math.Floor(d) && !double.IsInfinity(d) && Math.Abs(d) < 1e15 => ((long)d).ToString("N0", CultureInfo.CurrentCulture),
-        double d => d.ToString("0.####", CultureInfo.CurrentCulture),
-        _ => v.ToString() ?? ""
-    };
+    private static string FormatValue(object? v) => CellFormatter.Format(v, null);
+    private static string FormatValue(object? v, CellFormat? fmt) => CellFormatter.Format(v, fmt);
 
     // ---- Selection ----
 
@@ -611,8 +607,10 @@ public partial class SpreadsheetGrid : UserControl
     {
         if (sender is not Border b || b.Tag is not string id) return;
         Focus();
-        if (_editingInput != null) { CommitEdit(true); }
 
+        // Formula-mode clicks insert a cell reference rather than committing the
+        // edit. Check this BEFORE deciding whether to commit, otherwise the very
+        // first click ends the edit and you can never extend a formula by mouse.
         if (IsFormulaMode())
         {
             _formulaSelecting = true;
@@ -635,6 +633,9 @@ public partial class SpreadsheetGrid : UserControl
             e.Handled = true;
             return;
         }
+
+        // Not editing a formula — commit any in-progress edit before re-selecting.
+        if (_editingInput != null) { CommitEdit(true); }
 
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && !string.IsNullOrEmpty(SelectedCell))
         {
@@ -744,7 +745,7 @@ public partial class SpreadsheetGrid : UserControl
         {
             var id = GridData.CellId(col, r);
             var v = Data.GetValue(id);
-            var str = FormatValue(v);
+            var str = FormatValue(v, Data.GetFormat(id));
             if (string.IsNullOrEmpty(str)) continue;
             var ft = new FormattedText(str, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
                 typeface, 13.0, Brushes.Black, dpi);
@@ -1107,6 +1108,17 @@ public partial class SpreadsheetGrid : UserControl
 
         if (ctrl)
         {
+            // Ctrl+Shift combos: number-format shortcuts (matches Excel's $/%/!).
+            if (shift)
+            {
+                switch (e.Key)
+                {
+                    case Key.D4: e.Handled = true; ApplyFormatStyle(FormatStyle.Currency); return; // Ctrl+Shift+$
+                    case Key.D5: e.Handled = true; ApplyFormatStyle(FormatStyle.Percent); return;  // Ctrl+Shift+%
+                    case Key.D1: e.Handled = true; ApplyFormatStyle(FormatStyle.Number); return;   // Ctrl+Shift+!
+                    case Key.OemTilde: e.Handled = true; ClearFormat(); return;                    // Ctrl+Shift+~
+                }
+            }
             switch (e.Key)
             {
                 case Key.C: e.Handled = true; Copy(false); return;
@@ -1119,6 +1131,8 @@ public partial class SpreadsheetGrid : UserControl
                     return;
                 case Key.Z: e.Handled = true; Undo(); return;
                 case Key.Y: e.Handled = true; Redo(); return;
+                case Key.OemPeriod: e.Handled = true; AdjustDecimals(+1); return;  // Ctrl+. → more decimals
+                case Key.OemComma:  e.Handled = true; AdjustDecimals(-1); return;  // Ctrl+, → fewer decimals
             }
         }
 
@@ -1214,6 +1228,159 @@ public partial class SpreadsheetGrid : UserControl
     }
 
     // ---- Clipboard ----
+
+    // ---- Cell context menu ----
+
+    private ContextMenu? _cellContextMenu;
+    private MenuItem? _miCurrency, _miPercent, _miNumber;
+
+    private ContextMenu GetCellContextMenu()
+    {
+        if (_cellContextMenu != null) return _cellContextMenu;
+        var menu = new ContextMenu();
+
+        _miCurrency = new MenuItem { Header = "Format as currency", InputGestureText = "Ctrl+Shift+$" };
+        _miCurrency.Click += (_, _) => ApplyFormatStyle(FormatStyle.Currency);
+        menu.Items.Add(_miCurrency);
+
+        _miPercent = new MenuItem { Header = "Format as percent", InputGestureText = "Ctrl+Shift+%" };
+        _miPercent.Click += (_, _) => ApplyFormatStyle(FormatStyle.Percent);
+        menu.Items.Add(_miPercent);
+
+        _miNumber = new MenuItem { Header = "Format as number", InputGestureText = "Ctrl+Shift+!" };
+        _miNumber.Click += (_, _) => ApplyFormatStyle(FormatStyle.Number);
+        menu.Items.Add(_miNumber);
+
+        menu.Items.Add(new Separator());
+
+        var miInc = new MenuItem { Header = "More decimals", InputGestureText = "Ctrl+." };
+        miInc.Click += (_, _) => AdjustDecimals(+1);
+        menu.Items.Add(miInc);
+
+        var miDec = new MenuItem { Header = "Fewer decimals", InputGestureText = "Ctrl+," };
+        miDec.Click += (_, _) => AdjustDecimals(-1);
+        menu.Items.Add(miDec);
+
+        menu.Items.Add(new Separator());
+
+        var miClear = new MenuItem { Header = "Clear format", InputGestureText = "Ctrl+Shift+~" };
+        miClear.Click += (_, _) => ClearFormat();
+        menu.Items.Add(miClear);
+
+        // Show check marks against the active style when the menu opens
+        menu.Opened += (_, _) =>
+        {
+            var f = GetSelectionFormat();
+            if (_miCurrency != null) _miCurrency.IsChecked = f?.Style == FormatStyle.Currency;
+            if (_miPercent != null) _miPercent.IsChecked = f?.Style == FormatStyle.Percent;
+            if (_miNumber != null) _miNumber.IsChecked = f?.Style == FormatStyle.Number;
+        };
+
+        _cellContextMenu = menu;
+        return menu;
+    }
+
+    private void Cell_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Border b || b.Tag is not string id) return;
+        // If the right-clicked cell isn't part of the current selection, select it.
+        bool inSelection = false;
+        if (_selectionRange is { } rng)
+        {
+            var p = GridData.ParseRef(id);
+            if (p != null && p.Value.col >= rng.minC && p.Value.col <= rng.maxC
+                          && p.Value.row >= rng.minR && p.Value.row <= rng.maxR)
+                inSelection = true;
+        }
+        else if (id == SelectedCell)
+        {
+            inSelection = true;
+        }
+        if (!inSelection) SelectCell(id);
+        // Don't set e.Handled — WPF will pop the ContextMenu attached to this Border.
+    }
+
+    // ---- Cell formatting ----
+
+    private IEnumerable<string> SelectedCellIds()
+    {
+        if (_selectionRange is { } rng)
+        {
+            for (int r = rng.minR; r <= rng.maxR; r++)
+                for (int c = rng.minC; c <= rng.maxC; c++)
+                    yield return GridData.CellId(c, r);
+        }
+        else if (!string.IsNullOrEmpty(SelectedCell))
+        {
+            yield return SelectedCell;
+        }
+    }
+
+    public void ApplyFormatStyle(FormatStyle style)
+    {
+        var ids = SelectedCellIds().ToList();
+        if (ids.Count == 0) return;
+        PushUndo();
+        foreach (var id in ids)
+        {
+            var existing = Data.GetFormat(id);
+            // Toggle off if the same style is already applied
+            if (existing != null && existing.Style == style)
+            {
+                Data.SetFormat(id, null);
+            }
+            else
+            {
+                int? defaultDecimals = style switch
+                {
+                    FormatStyle.Currency => 2,
+                    FormatStyle.Percent => 0,
+                    FormatStyle.Number => existing?.Decimals ?? 2,
+                    _ => null
+                };
+                Data.SetFormat(id, new CellFormat(style, defaultDecimals, ThousandsSeparator: true));
+            }
+        }
+        StatusChanged?.Invoke($"Format: {style}");
+    }
+
+    public void AdjustDecimals(int delta)
+    {
+        var ids = SelectedCellIds().ToList();
+        if (ids.Count == 0) return;
+        PushUndo();
+        foreach (var id in ids)
+        {
+            var f = Data.GetFormat(id);
+            // If no explicit format yet, treat as Number with 2 decimals as a starting point.
+            var style = f?.Style ?? FormatStyle.Number;
+            if (style == FormatStyle.Auto) style = FormatStyle.Number;
+            int currentDec = f?.Decimals ?? (style switch
+            {
+                FormatStyle.Currency => 2,
+                FormatStyle.Percent => 0,
+                _ => 2
+            });
+            int newDec = Math.Clamp(currentDec + delta, 0, 6);
+            Data.SetFormat(id, new CellFormat(style, newDec, f?.ThousandsSeparator ?? true));
+        }
+        StatusChanged?.Invoke(delta > 0 ? "More decimals" : "Fewer decimals");
+    }
+
+    public void ClearFormat()
+    {
+        var ids = SelectedCellIds().ToList();
+        if (ids.Count == 0) return;
+        PushUndo();
+        foreach (var id in ids) Data.SetFormat(id, null);
+        StatusChanged?.Invoke("Format cleared");
+    }
+
+    public CellFormat? GetSelectionFormat()
+    {
+        // Return the format of the active cell — used by UI to reflect current state.
+        return string.IsNullOrEmpty(SelectedCell) ? null : Data.GetFormat(SelectedCell);
+    }
 
     public void Copy(bool isCut)
     {

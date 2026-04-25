@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Match the app's TFM so we can reference its types. The tests run headless;
+         we keep -windows so WPF types resolve, but we never construct UI objects. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Scratchpad.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\app\Scratchpad.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Auto-run tests after a successful build so regressions show up immediately
+       without needing a separate `dotnet test` invocation. -->
+  <Target Name="RunTestsAfterBuild" AfterTargets="Build" Condition="'$(RunTestsAfterBuild)' != 'false'">
+    <Message Importance="high" Text="Running Scratchpad tests..." />
+    <Exec Command="dotnet test &quot;$(MSBuildProjectFullPath)&quot; --no-build --nologo --logger &quot;console;verbosity=normal&quot;"
+          ContinueOnError="false" />
+  </Target>
+
+</Project>

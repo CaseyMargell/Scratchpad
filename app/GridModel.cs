@@ -25,7 +25,22 @@ public class Cell
 {
     public string Raw { get; set; } = "";
     public object? Value { get; set; }
+    public CellFormat? Format { get; set; }
 }
+
+public enum FormatStyle
+{
+    /// <summary>No explicit format; use the default rendering.</summary>
+    Auto,
+    /// <summary>Plain number with optional thousands separator and decimals.</summary>
+    Number,
+    /// <summary>Prefixed with $, thousands separator on by default, 2 decimals by default.</summary>
+    Currency,
+    /// <summary>Value × 100 with % suffix, 0 decimals by default.</summary>
+    Percent
+}
+
+public record CellFormat(FormatStyle Style, int? Decimals = null, bool ThousandsSeparator = true);
 
 /// <summary>
 /// Describes what changed in a single grid update so subscribers can avoid
@@ -86,10 +101,15 @@ public class GridData
     /// </summary>
     public void SetCell(string id, string raw)
     {
-        // Update cell storage
+        // Update cell storage. Preserve any existing format when the value is
+        // cleared so users can format an empty cell and have it persist.
         if (string.IsNullOrEmpty(raw))
         {
-            Cells.Remove(id);
+            if (Cells.TryGetValue(id, out var existing))
+            {
+                if (existing.Format == null) Cells.Remove(id);
+                else { existing.Raw = ""; existing.Value = ""; }
+            }
         }
         else
         {
@@ -208,10 +228,35 @@ public class GridData
         Changed?.Invoke(new GridChange(IsFull: true, Array.Empty<string>()));
     }
 
+    public CellFormat? GetFormat(string id) =>
+        Cells.TryGetValue(id, out var c) ? c.Format : null;
+
+    public void SetFormat(string id, CellFormat? format)
+    {
+        if (format == null)
+        {
+            if (Cells.TryGetValue(id, out var c) && c.Format != null)
+            {
+                c.Format = null;
+                Changed?.Invoke(new GridChange(IsFull: false, new[] { id }));
+            }
+            return;
+        }
+        if (!Cells.TryGetValue(id, out var cell))
+        {
+            cell = new Cell();
+            Cells[id] = cell;
+        }
+        cell.Format = format;
+        Changed?.Invoke(new GridChange(IsFull: false, new[] { id }));
+    }
+
+    private record CellSnapshot(string Raw, CellFormat? Format);
+
     public string Snapshot()
     {
         return System.Text.Json.JsonSerializer.Serialize(
-            Cells.ToDictionary(kv => kv.Key, kv => kv.Value.Raw));
+            Cells.ToDictionary(kv => kv.Key, kv => new CellSnapshot(kv.Value.Raw, kv.Value.Format)));
     }
 
     public void Restore(string snapshot)
@@ -219,12 +264,33 @@ public class GridData
         Cells.Clear();
         _dependents.Clear();
         _dependencies.Clear();
-        var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(snapshot);
-        if (map != null)
+
+        // Try the new snapshot format (with cell metadata) first, fall back to the
+        // legacy plain-string format for older saved data and undo stacks.
+        try
         {
-            foreach (var kv in map)
-                Cells[kv.Key] = new Cell { Raw = kv.Value };
+            var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CellSnapshot>>(snapshot);
+            if (map != null)
+            {
+                foreach (var kv in map)
+                    Cells[kv.Key] = new Cell { Raw = kv.Value.Raw, Format = kv.Value.Format };
+                RecalcAll();
+                return;
+            }
         }
+        catch { /* Fall through to legacy */ }
+
+        try
+        {
+            var legacy = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(snapshot);
+            if (legacy != null)
+            {
+                foreach (var kv in legacy)
+                    Cells[kv.Key] = new Cell { Raw = kv.Value };
+            }
+        }
+        catch { /* Empty snapshot */ }
+
         RecalcAll();
     }
 

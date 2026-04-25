@@ -10,6 +10,27 @@ cd app
 dotnet publish -c Release
 ```
 
+## Run tests
+
+Tests live in `app.tests/` and run automatically every time the solution is built
+(via an `AfterTargets="Build"` MSBuild target on the test project). To run them
+explicitly:
+
+```
+cd <repo root>
+dotnet test
+```
+
+To build without auto-running tests (e.g., during `publish`):
+
+```
+dotnet publish -c Release -p:RunTestsAfterBuild=false
+```
+
+When fixing a bug, prefer to add a regression test in `app.tests/` first — this
+prevents the bug from coming back. See `FormulaEvaluatorTests.cs`
+(`Adjust_Regression_CopyPasteFormula`) for the existing pattern.
+
 Output: `app/bin/Release/net8.0-windows/win-x64/publish/Scratchpad.exe`
 
 Everything (runtime, WPF, ClosedXML, icons) is bundled into one file.

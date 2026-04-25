@@ -83,6 +83,21 @@
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock Text="Reset cells" />
+          <TextBlock Text="Wipes every cell value and formula. Undoable." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="1" x:Name="ClearAllBtn" Content="Clear all cells" Padding="12,4" Click="ClearAllBtn_Click"
+                Background="{DynamicResource BgInputBrush}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource BorderInputBrush}" BorderThickness="1" VerticalAlignment="Center" />
+      </Grid>
+
+      <Border BorderBrush="{DynamicResource BorderBrush1}" BorderThickness="0,0,0,1" Margin="0,6" />
+
+      <Grid Margin="0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
           <TextBlock Text="Close behavior" />
           <TextBlock Text="X hides the window; hotkey brings it back. Use Quit to fully exit." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" />
         </StackPanel>

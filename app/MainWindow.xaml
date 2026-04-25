@@ -33,12 +33,41 @@
           <Button x:Name="OpenBtn" Style="{DynamicResource IconButton}" Margin="2,0" ToolTip="Open .xlsx" Click="OpenBtn_Click">
             <Path Data="{DynamicResource IconOpenGeometry}" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" />
           </Button>
-          <Button x:Name="ClearBtn" Style="{DynamicResource IconButton}" Margin="2,0" ToolTip="Clear all cells" Click="ClearBtn_Click">
-            <Path Data="{DynamicResource IconDeleteGeometry}" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" />
+          <Button x:Name="FormatBtn" Style="{DynamicResource IconButton}" Margin="2,0" ToolTip="Format cell (Ctrl+Shift+$/%/!)" Click="FormatBtn_Click">
+            <Path Data="{DynamicResource IconFormatGeometry}" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" />
           </Button>
           <Button x:Name="SettingsBtn" Style="{DynamicResource IconButton}" Margin="2,0" ToolTip="Settings" Click="SettingsBtn_Click">
             <Path Data="{DynamicResource IconSettingsGeometry}" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" />
           </Button>
+
+          <!-- Format popover anchored to FormatBtn -->
+          <Popup x:Name="FormatPopup" PlacementTarget="{Binding ElementName=FormatBtn}" Placement="Bottom"
+                 StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Background="{DynamicResource BgBrush}" BorderBrush="{DynamicResource BorderInputBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="10" MinWidth="220">
+              <StackPanel>
+                <TextBlock Text="Format" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{DynamicResource TextBrush}" />
+                <UniformGrid Rows="1" Columns="3" Margin="0,0,0,10">
+                  <Button x:Name="FmtCurrencyBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="$" Click="FmtCurrencyBtn_Click" />
+                  <Button x:Name="FmtPercentBtn" Style="{DynamicResource SegButton}" Margin="0,0,4,0" Content="%" Click="FmtPercentBtn_Click" />
+                  <Button x:Name="FmtNumberBtn" Style="{DynamicResource SegButton}" Content="1,234" Click="FmtNumberBtn_Click" />
+                </UniformGrid>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="Decimals" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="FmtDecLessBtn" Style="{DynamicResource SegButton}" Content="−" Width="28" Click="FmtDecLessBtn_Click" />
+                    <TextBlock x:Name="FmtDecValue" Text="—" MinWidth="24" TextAlignment="Center" VerticalAlignment="Center" Margin="6,0" Foreground="{DynamicResource TextBrush}" />
+                    <Button x:Name="FmtDecMoreBtn" Style="{DynamicResource SegButton}" Content="+" Width="28" Click="FmtDecMoreBtn_Click" />
+                  </StackPanel>
+                </Grid>
+                <Button x:Name="FmtClearBtn" Style="{DynamicResource SegButton}" Content="Clear format" HorizontalAlignment="Stretch" Click="FmtClearBtn_Click" />
+              </StackPanel>
+            </Border>
+          </Popup>
         </StackPanel>
       </Grid>
     </Border>
