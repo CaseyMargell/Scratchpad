@@ -4,8 +4,8 @@ package-lock.json
 Thumbs.db
 
 # .NET build outputs
-app/bin/
-app/obj/
+**/bin/
+**/obj/
 *.user
 *.suo
 .vs/
