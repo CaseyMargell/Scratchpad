@@ -9,7 +9,7 @@
       "Scratchpad.Tests/1.0.0": {
         "dependencies": {
           "Microsoft.NET.Test.Sdk": "17.11.1",
-          "Scratchpad": "2.1.1",
+          "Scratchpad": "2.2.0",
           "xunit": "2.9.2",
           "xunit.runner.visualstudio": "2.8.2"
         },
@@ -1078,14 +1078,14 @@
         }
       },
       "xunit.runner.visualstudio/2.8.2": {},
-      "Scratchpad/2.1.1": {
+      "Scratchpad/2.2.0": {
         "dependencies": {
           "ClosedXML": "0.102.2"
         },
         "runtime": {
           "Scratchpad.dll": {
-            "assemblyVersion": "2.1.1",
-            "fileVersion": "2.1.1.0"
+            "assemblyVersion": "2.2.0",
+            "fileVersion": "2.2.0.0"
           }
         }
       }
@@ -1755,7 +1755,7 @@
       "path": "xunit.runner.visualstudio/2.8.2",
       "hashPath": "xunit.runner.visualstudio.2.8.2.nupkg.sha512"
     },
-    "Scratchpad/2.1.1": {
+    "Scratchpad/2.2.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

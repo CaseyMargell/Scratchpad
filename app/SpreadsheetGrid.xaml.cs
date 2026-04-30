@@ -1081,7 +1081,7 @@ public partial class SpreadsheetGrid : UserControl
                 HighlightFormulaRange(anchorId, cursorId);
             }
         }
-        else if (_arrowRefActive && e.Key != Key.Up && e.Key != Key.Down && e.Key != Key.Left && e.Key != Key.Right)
+        else if (_arrowRefActive && IsArrowRefResetKey(e.Key))
         {
             _arrowRefActive = false;
             ClearFormulaRefs();
@@ -1089,6 +1089,25 @@ public partial class SpreadsheetGrid : UserControl
             _formulaInsertPos = end;
             _formulaInsertLen = 0;
         }
+    }
+
+    /// <summary>
+    /// Should pressing this key end an in-progress arrow-ref selection?
+    /// Modifier keys (Shift, Ctrl, Alt, Win) MUST NOT reset state, because pressing
+    /// e.g. Shift before Shift+Up otherwise wipes the anchor and the user can't
+    /// extend the reference into a range.
+    /// </summary>
+    private static bool IsArrowRefResetKey(Key k)
+    {
+        return k switch
+        {
+            Key.Up or Key.Down or Key.Left or Key.Right => false,
+            Key.LeftShift or Key.RightShift => false,
+            Key.LeftCtrl or Key.RightCtrl => false,
+            Key.LeftAlt or Key.RightAlt or Key.System => false,
+            Key.LWin or Key.RWin => false,
+            _ => true
+        };
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)

@@ -247,3 +247,65 @@ public class FormulaEvaluatorTests
         Assert.Equal("=A1", result);
     }
 }
+
+/// <summary>
+/// Tests for the small static helpers exposed by SpreadsheetGrid for which
+/// we don't need to instantiate WPF.
+/// </summary>
+public class SpreadsheetGridHelperTests
+{
+    /// <summary>
+    /// Regression: pressing Shift before pressing Up (i.e. Shift+Up) must not
+    /// abort an in-progress arrow-ref selection. The Shift KeyDown fires first
+    /// as a separate event, and previously hit the "reset" branch in
+    /// EditInput_PreviewKeyDown — so the Up that followed re-initialized
+    /// state instead of extending the range.
+    /// </summary>
+    [Theory]
+    [InlineData(System.Windows.Input.Key.LeftShift)]
+    [InlineData(System.Windows.Input.Key.RightShift)]
+    [InlineData(System.Windows.Input.Key.LeftCtrl)]
+    [InlineData(System.Windows.Input.Key.RightCtrl)]
+    [InlineData(System.Windows.Input.Key.LeftAlt)]
+    [InlineData(System.Windows.Input.Key.RightAlt)]
+    [InlineData(System.Windows.Input.Key.LWin)]
+    [InlineData(System.Windows.Input.Key.RWin)]
+    [InlineData(System.Windows.Input.Key.System)]
+    public void ArrowRefReset_ModifierKeys_DoNotReset(System.Windows.Input.Key k)
+    {
+        Assert.False(InvokeIsArrowRefResetKey(k),
+            $"Modifier key {k} must not reset the arrow-ref state.");
+    }
+
+    [Theory]
+    [InlineData(System.Windows.Input.Key.Up)]
+    [InlineData(System.Windows.Input.Key.Down)]
+    [InlineData(System.Windows.Input.Key.Left)]
+    [InlineData(System.Windows.Input.Key.Right)]
+    public void ArrowRefReset_ArrowKeys_DoNotReset(System.Windows.Input.Key k)
+    {
+        Assert.False(InvokeIsArrowRefResetKey(k),
+            $"Arrow key {k} must not reset state — it advances the ref cursor.");
+    }
+
+    [Theory]
+    [InlineData(System.Windows.Input.Key.A)]
+    [InlineData(System.Windows.Input.Key.D5)]
+    [InlineData(System.Windows.Input.Key.OemPlus)]
+    [InlineData(System.Windows.Input.Key.OemMinus)]
+    [InlineData(System.Windows.Input.Key.Space)]
+    public void ArrowRefReset_PrintableKeys_DoReset(System.Windows.Input.Key k)
+    {
+        Assert.True(InvokeIsArrowRefResetKey(k),
+            $"Printable key {k} should reset arrow-ref state — user is moving on.");
+    }
+
+    private static bool InvokeIsArrowRefResetKey(System.Windows.Input.Key k)
+    {
+        var method = typeof(SpreadsheetGrid).GetMethod(
+            "IsArrowRefResetKey",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method!.Invoke(null, new object[] { k })!;
+    }
+}
