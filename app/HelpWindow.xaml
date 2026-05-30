@@ -24,6 +24,7 @@
         <Grid.RowDefinitions>
           <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
           <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+          <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Enter" FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
         <TextBlock Grid.Row="0" Grid.Column="1" Text="Edit cell / submit" Margin="0,2" />
@@ -41,6 +42,14 @@
         <TextBlock Grid.Row="6" Grid.Column="1" Text="Select all" Margin="0,2" />
         <TextBlock Grid.Row="7" Grid.Column="0" Text="Shift + arrow / click" FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
         <TextBlock Grid.Row="7" Grid.Column="1" Text="Extend selection into range" Margin="0,2" />
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+B / I / U / 5" FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
+        <TextBlock Grid.Row="8" Grid.Column="1" Text="Bold / Italic / Underline / Strikethrough" Margin="0,2" />
+        <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+$ / % / !" FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
+        <TextBlock Grid.Row="9" Grid.Column="1" Text="Currency / Percent / Number formats" Margin="0,2" />
+        <TextBlock Grid.Row="10" Grid.Column="0" Text="Ctrl+. / Ctrl+," FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
+        <TextBlock Grid.Row="10" Grid.Column="1" Text="More / fewer decimals" Margin="0,2" />
+        <TextBlock Grid.Row="11" Grid.Column="0" Text="Ctrl+Shift+~" FontFamily="Cascadia Code, Consolas" Margin="0,2,12,2" />
+        <TextBlock Grid.Row="11" Grid.Column="1" Text="Clear cell format" Margin="0,2" />
       </Grid>
 
       <TextBlock Text="SUPPORTED FORMULAS" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,6" />

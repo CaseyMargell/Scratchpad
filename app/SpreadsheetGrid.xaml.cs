@@ -515,6 +515,20 @@ public partial class SpreadsheetGrid : UserControl
                 Tag = OverlayTagPrefix + id
             };
             if (isNumber) text.HorizontalAlignment = HorizontalAlignment.Right;
+
+            // Apply text decorations from the cell's format.
+            if (fmt != null)
+            {
+                if (fmt.Bold) text.FontWeight = FontWeights.SemiBold;
+                if (fmt.Italic) text.FontStyle = FontStyles.Italic;
+                if (fmt.Underline || fmt.Strikethrough)
+                {
+                    var decs = new TextDecorationCollection();
+                    if (fmt.Underline) decs.Add(TextDecorations.Underline);
+                    if (fmt.Strikethrough) decs.Add(TextDecorations.Strikethrough);
+                    text.TextDecorations = decs;
+                }
+            }
             Grid.SetColumn(text, c + 1);
             Grid.SetRow(text, row + 1);
             Grid.SetColumnSpan(text, span);
@@ -1152,6 +1166,10 @@ public partial class SpreadsheetGrid : UserControl
                 case Key.Y: e.Handled = true; Redo(); return;
                 case Key.OemPeriod: e.Handled = true; AdjustDecimals(+1); return;  // Ctrl+. → more decimals
                 case Key.OemComma:  e.Handled = true; AdjustDecimals(-1); return;  // Ctrl+, → fewer decimals
+                case Key.B: e.Handled = true; ToggleBold(); return;
+                case Key.I: e.Handled = true; ToggleItalic(); return;
+                case Key.U: e.Handled = true; ToggleUnderline(); return;
+                case Key.D5: e.Handled = true; ToggleStrikethrough(); return;       // Ctrl+5 (Excel standard)
             }
         }
 
@@ -1252,6 +1270,7 @@ public partial class SpreadsheetGrid : UserControl
 
     private ContextMenu? _cellContextMenu;
     private MenuItem? _miCurrency, _miPercent, _miNumber;
+    private MenuItem? _miBold, _miItalic, _miUnderline, _miStrikethrough;
 
     private ContextMenu GetCellContextMenu()
     {
@@ -1282,17 +1301,39 @@ public partial class SpreadsheetGrid : UserControl
 
         menu.Items.Add(new Separator());
 
+        _miBold = new MenuItem { Header = "Bold", InputGestureText = "Ctrl+B" };
+        _miBold.Click += (_, _) => ToggleBold();
+        menu.Items.Add(_miBold);
+
+        _miItalic = new MenuItem { Header = "Italic", InputGestureText = "Ctrl+I" };
+        _miItalic.Click += (_, _) => ToggleItalic();
+        menu.Items.Add(_miItalic);
+
+        _miUnderline = new MenuItem { Header = "Underline", InputGestureText = "Ctrl+U" };
+        _miUnderline.Click += (_, _) => ToggleUnderline();
+        menu.Items.Add(_miUnderline);
+
+        _miStrikethrough = new MenuItem { Header = "Strikethrough", InputGestureText = "Ctrl+5" };
+        _miStrikethrough.Click += (_, _) => ToggleStrikethrough();
+        menu.Items.Add(_miStrikethrough);
+
+        menu.Items.Add(new Separator());
+
         var miClear = new MenuItem { Header = "Clear format", InputGestureText = "Ctrl+Shift+~" };
         miClear.Click += (_, _) => ClearFormat();
         menu.Items.Add(miClear);
 
-        // Show check marks against the active style when the menu opens
+        // Show check marks for active styles when the menu opens
         menu.Opened += (_, _) =>
         {
             var f = GetSelectionFormat();
             if (_miCurrency != null) _miCurrency.IsChecked = f?.Style == FormatStyle.Currency;
             if (_miPercent != null) _miPercent.IsChecked = f?.Style == FormatStyle.Percent;
             if (_miNumber != null) _miNumber.IsChecked = f?.Style == FormatStyle.Number;
+            if (_miBold != null) _miBold.IsChecked = f?.Bold == true;
+            if (_miItalic != null) _miItalic.IsChecked = f?.Italic == true;
+            if (_miUnderline != null) _miUnderline.IsChecked = f?.Underline == true;
+            if (_miStrikethrough != null) _miStrikethrough.IsChecked = f?.Strikethrough == true;
         };
 
         _cellContextMenu = menu;
@@ -1343,10 +1384,12 @@ public partial class SpreadsheetGrid : UserControl
         foreach (var id in ids)
         {
             var existing = Data.GetFormat(id);
-            // Toggle off if the same style is already applied
+            // Toggle off if the same style is already applied — but keep any
+            // text decorations the user had set (bold, italic, etc.).
             if (existing != null && existing.Style == style)
             {
-                Data.SetFormat(id, null);
+                var cleared = existing with { Style = FormatStyle.Auto, Decimals = null };
+                Data.SetFormat(id, cleared.IsDefault ? null : cleared);
             }
             else
             {
@@ -1357,7 +1400,12 @@ public partial class SpreadsheetGrid : UserControl
                     FormatStyle.Number => existing?.Decimals ?? 2,
                     _ => null
                 };
-                Data.SetFormat(id, new CellFormat(style, defaultDecimals, ThousandsSeparator: true));
+                var newFmt = (existing ?? new CellFormat(FormatStyle.Auto)) with
+                {
+                    Style = style,
+                    Decimals = defaultDecimals
+                };
+                Data.SetFormat(id, newFmt);
             }
         }
         StatusChanged?.Invoke($"Format: {style}");
@@ -1381,7 +1429,8 @@ public partial class SpreadsheetGrid : UserControl
                 _ => 2
             });
             int newDec = Math.Clamp(currentDec + delta, 0, 6);
-            Data.SetFormat(id, new CellFormat(style, newDec, f?.ThousandsSeparator ?? true));
+            var baseFmt = f ?? new CellFormat(FormatStyle.Auto);
+            Data.SetFormat(id, baseFmt with { Style = style, Decimals = newDec });
         }
         StatusChanged?.Invoke(delta > 0 ? "More decimals" : "Fewer decimals");
     }
@@ -1394,6 +1443,42 @@ public partial class SpreadsheetGrid : UserControl
         foreach (var id in ids) Data.SetFormat(id, null);
         StatusChanged?.Invoke("Format cleared");
     }
+
+    // ---- Text decorations (Bold / Italic / Underline / Strikethrough) ----
+    // Each toggle: if every selected cell has it on, turn off; else turn on for all.
+    // This matches Excel's "majority off → set on" behaviour.
+
+    private void ToggleDecoration(Func<CellFormat, bool> getter, Func<CellFormat, bool, CellFormat> setter, string label)
+    {
+        var ids = SelectedCellIds().ToList();
+        if (ids.Count == 0) return;
+        PushUndo();
+        bool allOn = ids.All(id =>
+        {
+            var f = Data.GetFormat(id);
+            return f != null && getter(f);
+        });
+        bool turnOn = !allOn;
+        foreach (var id in ids)
+        {
+            var f = Data.GetFormat(id) ?? new CellFormat(FormatStyle.Auto);
+            var updated = setter(f, turnOn);
+            Data.SetFormat(id, updated.IsDefault ? null : updated);
+        }
+        StatusChanged?.Invoke($"{label}: {(turnOn ? "on" : "off")}");
+    }
+
+    public void ToggleBold() =>
+        ToggleDecoration(f => f.Bold, (f, on) => f with { Bold = on }, "Bold");
+
+    public void ToggleItalic() =>
+        ToggleDecoration(f => f.Italic, (f, on) => f with { Italic = on }, "Italic");
+
+    public void ToggleUnderline() =>
+        ToggleDecoration(f => f.Underline, (f, on) => f with { Underline = on }, "Underline");
+
+    public void ToggleStrikethrough() =>
+        ToggleDecoration(f => f.Strikethrough, (f, on) => f with { Strikethrough = on }, "Strikethrough");
 
     public CellFormat? GetSelectionFormat()
     {
@@ -1555,8 +1640,20 @@ public partial class SpreadsheetGrid : UserControl
     public void ClearAll()
     {
         PushUndo();
-        Data.Clear();
+        Data.Clear();   // wipes cells + dependency graph (_dependents / _dependencies)
+
+        // Reset all transient interaction state so nothing references old cells.
+        _selectionRange = null;
+        _selectionEndpoint = null;
+        _arrowRefActive = false;
+        _lastFormulaClickId = null;
+        _internalClipboardText = null;
+        _internalClipboardOrigin = null;
+        _internalClipboardRaws = null;
+        if (_editingInput != null) { _editingInput = null; _editingCellId = null; }
+
         Rebuild();
+        SelectCell("A1");
         StatusChanged?.Invoke("Cleared");
     }
 

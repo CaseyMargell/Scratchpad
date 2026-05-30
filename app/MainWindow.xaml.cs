@@ -61,6 +61,22 @@ public partial class MainWindow : Window
             Grid1.SelectCell(AppSettings.Load().LastSelectedCell ?? "A1");
             Grid1.FocusSelectedCell();
             UpdateCellRefAndStats();
+
+            // WPF's workstation GC is conservative about Gen 2; after the big
+            // startup allocation burst (XAML parse, theme load, initial Rebuild)
+            // there's a lot of transient garbage worth collecting once we're idle.
+            // Schedule it after the first render so it doesn't slow first paint.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                new Action(() => { GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true); GC.WaitForPendingFinalizers(); }));
+        };
+
+        // Same idea when the window hides — release working set we don't need
+        // while sitting in the background waiting for the hotkey.
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is false)
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                    new Action(() => { GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true); GC.WaitForPendingFinalizers(); }));
         };
     }
 

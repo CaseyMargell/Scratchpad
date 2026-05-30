@@ -40,7 +40,23 @@ public enum FormatStyle
     Percent
 }
 
-public record CellFormat(FormatStyle Style, int? Decimals = null, bool ThousandsSeparator = true);
+public record CellFormat(
+    FormatStyle Style,
+    int? Decimals = null,
+    bool ThousandsSeparator = true,
+    bool Bold = false,
+    bool Italic = false,
+    bool Underline = false,
+    bool Strikethrough = false)
+{
+    /// <summary>
+    /// True when the format adds nothing beyond the default rendering — used to
+    /// decide when a cell's format can be removed entirely instead of stored.
+    /// </summary>
+    public bool IsDefault => Style == FormatStyle.Auto && Decimals == null
+                          && ThousandsSeparator
+                          && !Bold && !Italic && !Underline && !Strikethrough;
+}
 
 /// <summary>
 /// Describes what changed in a single grid update so subscribers can avoid

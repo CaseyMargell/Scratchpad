@@ -215,3 +215,68 @@ public class GridDataTests
         Assert.Equal("y", g.GetRaw("A1"));
     }
 }
+
+/// <summary>
+/// CellFormat carries number formatting AND text decorations. These tests
+/// verify the IsDefault helper and orthogonality between the two layers.
+/// </summary>
+public class CellFormatTests
+{
+    [Fact]
+    public void IsDefault_AutoNoDecorations_True()
+    {
+        var f = new CellFormat(FormatStyle.Auto);
+        Assert.True(f.IsDefault);
+    }
+
+    [Fact]
+    public void IsDefault_WithBold_False()
+    {
+        var f = new CellFormat(FormatStyle.Auto, Bold: true);
+        Assert.False(f.IsDefault);
+    }
+
+    [Fact]
+    public void IsDefault_WithCurrency_False()
+    {
+        var f = new CellFormat(FormatStyle.Currency, 2);
+        Assert.False(f.IsDefault);
+    }
+
+    [Fact]
+    public void Decorations_AreIndependentOfStyle()
+    {
+        // A bold currency cell can have all four properties combined; toggling
+        // any one with the `with` expression should leave the others alone.
+        var f = new CellFormat(FormatStyle.Currency, 2, Bold: true, Italic: true,
+                                Underline: true, Strikethrough: true);
+        var no_bold = f with { Bold = false };
+        Assert.Equal(FormatStyle.Currency, no_bold.Style);
+        Assert.Equal(2, no_bold.Decimals);
+        Assert.False(no_bold.Bold);
+        Assert.True(no_bold.Italic);
+        Assert.True(no_bold.Underline);
+        Assert.True(no_bold.Strikethrough);
+    }
+
+    [Fact]
+    public void Snapshot_PreservesAllDecorations()
+    {
+        // Regression coverage: if the CellSnapshot record drops a field, this fails.
+        var g = new GridData();
+        g.SetCell("A1", "x");
+        g.SetFormat("A1", new CellFormat(FormatStyle.Currency, 2,
+            Bold: true, Italic: true, Underline: true, Strikethrough: true));
+        var snap = g.Snapshot();
+
+        var g2 = new GridData();
+        g2.Restore(snap);
+
+        var f = g2.GetFormat("A1");
+        Assert.NotNull(f);
+        Assert.True(f!.Bold);
+        Assert.True(f.Italic);
+        Assert.True(f.Underline);
+        Assert.True(f.Strikethrough);
+    }
+}

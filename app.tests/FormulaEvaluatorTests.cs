@@ -120,6 +120,80 @@ public class FormulaEvaluatorTests
     }
 
     // ============================================================
+    //  Regression: number parsing with thousands separators.
+    //  Bug: a cell whose raw value contained a comma (e.g. "1,092.38",
+    //  typed directly or matching the thousands display format) caused
+    //  =B2*1.1 to resolve B2 to NaN and produce #ERR.
+    // ============================================================
+
+    [Fact]
+    public void Number_WithThousandsSeparator_Parses()
+    {
+        Assert.Equal(1092.38, Eval("1,092.38"));
+    }
+
+    [Fact]
+    public void Formula_ReferencingCommaNumber_DoesNotError()
+    {
+        var g = NewGrid();
+        g.SetCell("B2", "1,092.38");
+        var result = Eval("=B2*1.1", g);
+        Assert.IsType<double>(result);
+        Assert.Equal(1201.618, (double)result, 3);
+    }
+
+    [Fact]
+    public void Number_WithMultipleThousandsGroups_Parses()
+    {
+        Assert.Equal(1234567.0, Eval("1,234,567"));
+    }
+
+    // ============================================================
+    //  Regression: a formula referencing the same cell twice.
+    //  Bug: the shared `visited` set treated the second reference as a
+    //  cycle and returned NaN → #ERR. Each reference should resolve
+    //  independently; only true ancestor cycles are caught.
+    // ============================================================
+
+    [Fact]
+    public void Formula_SameCellReferencedTwice_Works()
+    {
+        var g = NewGrid();
+        g.SetCell("B2", "10");
+        Assert.Equal(20.0, Eval("=B2+B2", g));
+    }
+
+    [Fact]
+    public void Formula_SameCellInExpression_Works()
+    {
+        var g = NewGrid();
+        g.SetCell("C3", "100"); g.SetCell("C4", "10"); g.SetCell("C5", "5");
+        // References C3, C4, C5 — distinct, but exercises multi-ref resolution.
+        Assert.Equal(85.0, Eval("=C3-(C4+C5)", g));
+    }
+
+    [Fact]
+    public void Formula_TripleSameRef_Works()
+    {
+        var g = NewGrid();
+        g.SetCell("A1", "3");
+        Assert.Equal(9.0, Eval("=A1+A1+A1", g));
+    }
+
+    [Fact]
+    public void Formula_GenuineCycle_StillDetected()
+    {
+        // A1 -> B1 -> A1 must not hang and must not silently produce a wrong value.
+        var g = NewGrid();
+        g.SetCell("A1", "=B1+1");
+        g.SetCell("B1", "=A1+1");
+        var v = Eval("=A1", g);
+        // Cycle yields #ERR or NaN-derived error, but never a real finite number.
+        Assert.True(v is string || (v is double d && double.IsNaN(d)),
+            $"Expected error sentinel for a cycle, got {v}");
+    }
+
+    // ============================================================
     //  ExtractReferences — used by the dependency graph
     // ============================================================
 

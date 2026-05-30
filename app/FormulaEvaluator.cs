@@ -11,6 +11,15 @@ namespace Scratchpad;
 /// </summary>
 public static class FormulaEvaluator
 {
+    // Allow thousands separators (commas) when parsing numbers, so values like
+    // "1,092.38" — which users naturally type and which our own thousands format
+    // displays — parse correctly instead of failing to #ERR. Invariant culture:
+    // "," is the group separator, "." is the decimal point.
+    private const NumberStyles NumStyle = NumberStyles.Float | NumberStyles.AllowThousands;
+
+    private static bool TryParseNumber(string s, out double n) =>
+        double.TryParse(s, NumStyle, CultureInfo.InvariantCulture, out n);
+
     /// <summary>
     /// Extracts every cell id referenced by a formula, expanding range refs
     /// (A1:B3) into the full set of individual cells. Non-formula values
@@ -90,7 +99,7 @@ public static class FormulaEvaluator
         var trimmed = raw.Trim();
         if (!trimmed.StartsWith("="))
         {
-            if (double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var n))
+            if (TryParseNumber(trimmed, out var n))
                 return n;
             return trimmed;
         }
@@ -125,14 +134,20 @@ public static class FormulaEvaluator
                 return JsStr(v?.ToString() ?? "") + "+";
             });
 
-            // Cell references -> numeric values
+            // Cell references -> numeric values.
+            // `visited` is the DFS path from ancestor cells — used purely for cycle
+            // detection. We must NOT mutate it for sibling references in the same
+            // formula, or a formula that references the same cell twice (e.g. =B2+B2)
+            // would wrongly flag the second reference as a cycle. Each reference gets
+            // its own child path that includes only this id.
             expr = Regex.Replace(expr, @"([A-Z])(\d+)", m =>
             {
                 var id = m.Value.ToUpperInvariant();
-                if (visited.Contains(id)) return "NaN";
-                visited.Add(id);
+                if (visited.Contains(id)) return "NaN";  // genuine cycle along the path
                 var raw2 = grid.GetRaw(id);
-                var v = string.IsNullOrEmpty(raw2) ? (object)0.0 : Evaluate(raw2, grid, new HashSet<string>(visited));
+                if (string.IsNullOrEmpty(raw2)) return "0";
+                var childPath = new HashSet<string>(visited) { id };
+                var v = Evaluate(raw2, grid, childPath);
                 return ToDouble(v).ToString("R", CultureInfo.InvariantCulture);
             });
 
@@ -308,12 +323,13 @@ public static class FormulaEvaluator
         if (refParsed != null)
         {
             var id = GridData.CellId(refParsed.Value.col, refParsed.Value.row);
-            if (visited.Contains(id)) return double.NaN;
-            visited.Add(id);
+            if (visited.Contains(id)) return double.NaN;  // cycle along the path
             var raw = grid.GetRaw(id);
-            return string.IsNullOrEmpty(raw) ? "" : Evaluate(raw, grid, new HashSet<string>(visited));
+            if (string.IsNullOrEmpty(raw)) return "";
+            var childPath = new HashSet<string>(visited) { id };
+            return Evaluate(raw, grid, childPath);
         }
-        if (double.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out var n)) return n;
+        if (TryParseNumber(arg, out var n)) return n;
         return arg;
     }
 
@@ -321,7 +337,7 @@ public static class FormulaEvaluator
     {
         var c = crit?.ToString() ?? "";
         var m = Regex.Match(c, @"^([><=!]+)(.+)$");
-        if (m.Success && double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var n))
+        if (m.Success && TryParseNumber(m.Groups[2].Value, out var n))
         {
             if (val is not double dv) return false;
             return m.Groups[1].Value switch
@@ -353,7 +369,7 @@ public static class FormulaEvaluator
     {
         if (v is double d) return d;
         if (v is int i) return i;
-        if (v is string s && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var n)) return n;
+        if (v is string s && TryParseNumber(s, out var n)) return n;
         return double.NaN;
     }
 
